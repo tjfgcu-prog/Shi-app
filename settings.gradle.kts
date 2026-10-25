@@ -24,7 +24,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "恋语"
+rootProject.name = "时"
 include(":app")
 include(":core:domain")
 include(":core:common")
