@@ -17,8 +17,6 @@ android {
         // Force multi-DEX output
         multiDexEnabled = true
 
-        buildConfigField("String", "HARDENING_LEVEL", "\"OPEN_SOURCE\"")
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
