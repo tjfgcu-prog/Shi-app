@@ -1,8 +1,6 @@
 plugins {
     alias(libs.plugins.android.application)
-    
     alias(libs.plugins.kotlin.compose)
-    
 }
 
 android {
@@ -61,7 +59,6 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-        
         }
     }
     
@@ -72,7 +69,7 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
-        resValues = true
+        
     }
 
     // jniLibs are picked up automatically from src/main/jniLibs/
