@@ -1,6 +1,6 @@
 package com.lianyu.ai.common
 
-import android.os.Build
+
 import java.io.BufferedReader
 import java.io.File
 import java.io.InputStreamReader
@@ -55,12 +55,7 @@ object HardwareInfo {
         
         val coreCount: Int by lazy { Runtime.getRuntime().availableProcessors() }
         val maxFreqMhz: Int by lazy { readCpuMaxFreq() }
-        val maxRefreshRate: Int by lazy {
-            try {
-                val rate = Build::class.java.getField("REFRESH_RATE").get(null) as? Float
-                rate?.toInt() ?: 60
-            } catch (e: Exception) { 60 }
-        }
+        
 
         val isSnapdragon: Boolean get() = hardware.contains("qcom") || chipset.contains("msm") || chipset.contains("sm")
         val isMediatek: Boolean get() = hardware.contains("mt") || chipset.contains("mt") || socModel.contains("mediatek") || socModel.contains("dimensity")
