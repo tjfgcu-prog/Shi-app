@@ -22,9 +22,7 @@ dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:domain"))
 
-    
-    
-    
+    implementation(libs.kotlinx.coroutines.core)
     
     implementation("io.github.ljcamargo:llamacpp-kotlin:0.4.0")
     testImplementation(libs.junit)
