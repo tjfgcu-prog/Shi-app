@@ -281,6 +281,7 @@ class AiResponseFinalizer(
                     )
                 } else {
                     SecureLog.w("ChatViewModel", "voice synthesis failed, message stays as text (id=$messageId)")
+                    ChatDebugLog.log("[TTS] 语音合成失败/超时，消息保持文字 id=$messageId, 原因=${com.lianyu.ai.network.tts.SherpaLocalTtsProvider.lastError}")
                 }
             } catch (e: Exception) {
                 SecureLog.w("ChatViewModel", "voice upgrade failed for id=$messageId: ${e.message}")
