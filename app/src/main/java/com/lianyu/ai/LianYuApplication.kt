@@ -71,12 +71,31 @@ class LianYuApplication : Application(), ImageLoaderFactory, androidx.work.Confi
         instance = this
         // 新进程启动 = 本地模型一定不在内存里：把开关复位为关，保证开关等于"模型是否真的在运行"
         getSharedPreferences("gguf_model_prefs", MODE_PRIVATE).edit().putBoolean("gguf_enabled", false).apply()
+        logPreviousExitReasons()
         initBusiness(this)
         // 冷启动清空媒体解密临时缓存，避免明文副本无限堆积（源文件一直是加密的，清空不丢数据）
         try {
             java.io.File(cacheDir, "media_plain").deleteRecursively()
         } catch (_: Exception) { }
         }
+
+    /**
+     * [诊断] 把"上一个进程为什么没了"写进 files/chatvm_debug.log（仅 Android 11+）。
+     * REASON_LOW_MEMORY / REASON_SIGNALED(9) = 被系统因内存杀掉；
+     * REASON_CRASH_NATIVE = so 库（llama/sherpa）崩溃；REASON_CRASH = Java 异常。
+     */
+    private fun logPreviousExitReasons() {
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.R) return
+        runCatching {
+            val am = getSystemService(android.app.ActivityManager::class.java)
+            val fmt = java.text.SimpleDateFormat("MM-dd HH:mm:ss", Locale.US)
+            val lines = am.getHistoricalProcessExitReasons(packageName, 0, 5).joinToString("\n") { r ->
+                "${fmt.format(java.util.Date(r.timestamp))} [ExitInfo] reason=${r.reason} " +
+                    "status=${r.status} importance=${r.importance} pss=${r.pss / 1024}MB rss=${r.rss / 1024}MB desc=${r.description}"
+            }
+            java.io.File(filesDir, "chatvm_debug.log").appendText("$lines\n")
+        }
+    }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
