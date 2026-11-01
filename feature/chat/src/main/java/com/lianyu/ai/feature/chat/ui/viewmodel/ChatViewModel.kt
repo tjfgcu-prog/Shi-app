@@ -672,9 +672,13 @@ class ChatViewModel(
 
         // 无 API 时：仅做安全检查 + 提示，用户消息已在 sendMessage 中乐观存库显示
         if (_availableApis.value.isEmpty() && !isLocalModelEnabled()) {
+            // 已选了 GGUF 文件但本进程还没加载（重启/被系统杀掉后会复位），给出准确提示
+            val hasGguf = !getApplication<Application>()
+                .getSharedPreferences("gguf_model_prefs", android.content.Context.MODE_PRIVATE)
+                .getString("gguf_file_uri", null).isNullOrBlank()
             val tipMessage = ChatMessage(
                 companionId = companionId,
-                content = "请先配置API：我 → API设置 → 添加密钥",
+                content = if (hasGguf) "本地模型还没加载：我 → API设置 → 点「加载并测试」" else "请先配置API：我 → API设置 → 添加密钥",
                 isFromUser = false,
                 timestamp = System.currentTimeMillis()
             )
