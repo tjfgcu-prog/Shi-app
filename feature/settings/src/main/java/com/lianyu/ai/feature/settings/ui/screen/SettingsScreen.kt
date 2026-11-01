@@ -871,11 +871,16 @@ private fun GgufLocalModelSection(
                         scope.launch {
                             // 先卸载，避免文件被删除时模型还占着内存
                             provider?.unloadModel()
-                            val modelFile = java.io.File(context.filesDir, "local_gguf_model.gguf")
-                            if (modelFile.exists()) modelFile.delete()
+                            // 删除 5GB+ 大文件放到 IO 线程，并等原生层把文件映射释放完，空间才会立刻归还
+                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                kotlinx.coroutines.delay(1000)
+                                val modelFile = java.io.File(context.filesDir, "local_gguf_model.gguf")
+                                if (modelFile.exists()) modelFile.delete()
+                            }
                             prefs.edit()
                                 .remove("gguf_file_name")
                                 .remove("gguf_file_uri")
+                                .remove("gguf_last_load_time")
                                 .putBoolean("gguf_enabled", false)
                                 .commit()
                             ggufFileName = null
