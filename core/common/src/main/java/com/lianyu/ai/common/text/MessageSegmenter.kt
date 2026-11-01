@@ -18,7 +18,7 @@ object MessageSegmenter {
 
     // ── SIMPLE 模式正则 ──
     private val SPLIT_PARAGRAPH_REGEX = Regex("\\n{2,}")
-    private val SPLIT_SENTENCE_REGEX = Regex("(?<=[。！？～…!?~])\\s*")
+    private val SPLIT_SENTENCE_REGEX = Regex("(?<=[。！？～…!?~])(?![。！？～…!?~])\\s*")
 
     /**
      * 分段入口。
@@ -39,9 +39,26 @@ object MessageSegmenter {
         val trimmed = text.trim()
         val paragraphs = trimmed.split(SPLIT_PARAGRAPH_REGEX).filter { it.isNotBlank() }
         if (paragraphs.size >= 2) return paragraphs.map { it.trim() }
-        val sentences = trimmed.split(SPLIT_SENTENCE_REGEX).filter { it.isNotBlank() }
-        if (sentences.size >= 2) return sentences.map { it.trim() }
+        val sentences = mergePunctuationOnly(trimmed.split(SPLIT_SENTENCE_REGEX).filter { it.isNotBlank() }.map { it.trim() })
+        if (sentences.size >= 2) return sentences
         return listOf(trimmed)
+    }
+
+    /** 没有任何文字/数字的碎片（如单独的"…"）并入前一段，没有前一段则并入后一段。 */
+    private fun mergePunctuationOnly(parts: List<String>): List<String> {
+        val result = mutableListOf<String>()
+        var carry = ""
+        for (part in parts) {
+            val hasContent = part.any { it.isLetterOrDigit() }
+            if (!hasContent) {
+                if (result.isNotEmpty()) result[result.lastIndex] = result.last() + part else carry += part
+            } else {
+                result.add(carry + part)
+                carry = ""
+            }
+        }
+        if (carry.isNotEmpty()) result.add(carry)
+        return result
     }
 
     // ── GROUP: 原 GroupChatViewModel.splitIntoSegments + splitLongSegment ──
