@@ -8,6 +8,8 @@ import com.lianyu.ai.network.tts.ChatTtsConfig
 import com.lianyu.ai.network.tts.ChatTtsMode
 import com.lianyu.ai.network.tts.TtsService
 import com.lianyu.ai.network.tts.TtsTextCleaner
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 
@@ -34,7 +36,11 @@ class ChatTtsController(
         if (cleaned.isBlank()) return null
 
         val path = try {
-            withTimeoutOrNull(TimeoutBudgets.TTS_SYNTH_MS) { ttsService.synthesize(cleaned) }
+            // 多段回复会同时排队合成：先串行（超时只从轮到自己时开始算），
+            // 并且本地 VITS 在 LLM 同时推理（如剧情摘要）时会很慢，10 秒太短 → 放宽到 60 秒。
+            synthMutex.withLock {
+                withTimeoutOrNull(LOCAL_SYNTH_TIMEOUT_MS) { ttsService.synthesize(cleaned) }
+            }
         } catch (e: Exception) {
             SecureLog.e("ChatTtsController", "synthesizeVoiceReply failed", e)
             null
@@ -59,6 +65,11 @@ class ChatTtsController(
         } finally {
             retriever.release()
         }
+    }
+
+    private companion object {
+        val synthMutex = Mutex()
+        const val LOCAL_SYNTH_TIMEOUT_MS = 60_000L
     }
 
     /** 保留空实现：ChatViewModel 里如果还有旧的 stop() 调用不至于编译报错，可直接删掉调用处 */
