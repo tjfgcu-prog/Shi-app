@@ -1,10 +1,8 @@
 package com.lianyu.ai
 
 import android.app.Application
-import android.content.Context
 import android.content.res.Configuration
 
-import com.lianyu.ai.common.SaltStore
 import com.lianyu.ai.common.SecureLog
 import com.lianyu.ai.database.AppDatabase
 import com.lianyu.ai.database.DefaultCompanionSeeder
@@ -57,27 +55,22 @@ class LianYuApplication : Application(), ImageLoaderFactory, androidx.work.Confi
             .setMinimumLoggingLevel(android.util.Log.WARN)
             .build()
 
-    override fun attachBaseContext(base: Context) {
-        super.attachBaseContext(base)
-    }
-
-        override fun onCreate() {
-        // Global DNS resolution timeout (5s) — prevents DNS hang blocking all OkHttp calls
+    override fun onCreate() {
+        // 关闭 JVM 层 DNS 缓存，网络切换后立刻重新解析
         java.security.Security.setProperty("networkaddress.cache.ttl", "0")
         java.security.Security.setProperty("networkaddress.cache.negative.ttl", "0")
-        System.setProperty("sun.net.spi.nameservice.nameservers", "8.8.8.8")
-        System.setProperty("sun.net.spi.nameservice.domain", ".")
         super.onCreate()
         instance = this
         // 新进程启动 = 本地模型一定不在内存里：把开关复位为关，保证开关等于"模型是否真的在运行"
         getSharedPreferences("gguf_model_prefs", MODE_PRIVATE).edit().putBoolean("gguf_enabled", false).apply()
-        logPreviousExitReasons()
+        // 诊断日志写文件，放到后台线程，不拖慢冷启动
+        bgScope.launch { logPreviousExitReasons() }
         initBusiness(this)
         // 冷启动清空媒体解密临时缓存，避免明文副本无限堆积（源文件一直是加密的，清空不丢数据）
         try {
             java.io.File(cacheDir, "media_plain").deleteRecursively()
         } catch (_: Exception) { }
-        }
+    }
 
     /**
      * [诊断] 把"上一个进程为什么没了"写进 files/chatvm_debug.log（仅 Android 11+）。
@@ -93,7 +86,10 @@ class LianYuApplication : Application(), ImageLoaderFactory, androidx.work.Confi
                 "${fmt.format(java.util.Date(r.timestamp))} [ExitInfo] reason=${r.reason} " +
                     "status=${r.status} importance=${r.importance} pss=${r.pss / 1024}MB rss=${r.rss / 1024}MB desc=${r.description}"
             }
-            java.io.File(filesDir, "chatvm_debug.log").appendText("$lines\n")
+            val logFile = java.io.File(filesDir, "chatvm_debug.log")
+            // 调试日志只追加不清理会越来越大：超过 2MB 就从头记
+            if (logFile.exists() && logFile.length() > 2L * 1024 * 1024) logFile.delete()
+            logFile.appendText("$lines\n")
         }
     }
 
@@ -115,8 +111,6 @@ class LianYuApplication : Application(), ImageLoaderFactory, androidx.work.Confi
 
     override fun onTerminate() {
         bgScope.launch {
-            SaltStore.shutdown()
-            // EncryptedDatabaseWrapper.sealDatabase(this@LianYuApplication)
             AppDatabase.shutdown()
             ChatBackgroundCache.clear()
         }
@@ -131,7 +125,6 @@ class LianYuApplication : Application(), ImageLoaderFactory, androidx.work.Confi
         private val bgScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
         fun initBusiness(app: Application) {
-            SaltStore.init(app)
             SecureLog.init(com.lianyu.ai.BuildConfig.DEBUG)
             applyFixedLocale()
             AiService.initialize(app)

@@ -9,7 +9,6 @@ package com.lianyu.ai
 sealed class MainRoute(val route: String) {
     // === 主页 Tab ===
     object Home : MainRoute("home")
-    object Contacts : MainRoute("contacts")
     object Profile : MainRoute("profile")
 
     // === 聊天 ===

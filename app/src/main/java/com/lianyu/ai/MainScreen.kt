@@ -91,11 +91,10 @@ fun MainScreen(mainActivity: Activity) {
     
 
     fun openCompanionChat(companionId: Long) {
-        LastOpenedCompanionStore.save(context, companionId)
         navController.navigate(MainRoute.Chat(companionId).route)
     }
 
-    // 深度链接 / 冷启动恢复最近打开的单聊
+    // 深度链接：通知点击后直接打开对应单聊
     LaunchedEffect(Unit) {
         val intent = valActivity.intent
         if (intent.getBooleanExtra("open_chat", false)) {
@@ -250,7 +249,17 @@ fun MainScreen(mainActivity: Activity) {
                 }
                 composable(MainRoute.ChatDetail(0).route.replace("0", "{companionId}"), arguments = listOf(navArgument("companionId") { type = NavType.LongType })) { backStackEntry ->
                     val detailCompanionId = backStackEntry.arguments?.getLong("companionId") ?: 0L
-                    ChatDetailScreen(companionId = detailCompanionId, onNavigateBack = { navController.popBackStack() })
+                    // 从聊天页进入详情页时，复用聊天页的 ChatViewModel（拿不到就自己建，行为同前）
+                    val chatEntry = remember(backStackEntry) {
+                        runCatching {
+                            navController.getBackStackEntry(MainRoute.Chat(0).route.replace("0", "{companionId}"))
+                        }.getOrNull()?.takeIf { it.arguments?.getLong("companionId") == detailCompanionId }
+                    }
+                    ChatDetailScreen(
+                        companionId = detailCompanionId,
+                        onNavigateBack = { navController.popBackStack() },
+                        chatViewModelStoreOwner = chatEntry
+                    )
                 }
                 
 
