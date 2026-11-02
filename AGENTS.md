@@ -100,7 +100,6 @@ Pass arguments via navigation path parameters, not global state.
 ### UI (`core:ui-common`)
 
 - Theme is WeChat-style dark-first with liquid glass effects.
-- `HardwareInfo.tier` (LOW / MEDIUM / HIGH / ULTRA) controls animation intensity. On `LOW`, disable heavy effects like liquid glass.
 - Shared components: liquid glass, frosted glass nav, spring animations, shimmer skeletons, WeChat-style chat input bar.
 
 ### Background Services (`feature:notification`)
