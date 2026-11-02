@@ -35,6 +35,7 @@ open class CompanionKeepAliveService : Service() {
 
     private val heartbeatRunnable = object : Runnable {
         override fun run() {
+          try {
             // 仅当没有活跃的 CompanionMessageWorker 调度时才触发新调度。
             // enqueueUniqueWork(REPLACE) 虽然不会堆叠请求，但每次 REPLACE 会重置延迟，
             // 频繁 schedule 会覆盖用户在 ChatDetailScreen 里设置的大间隔（如 360 分钟→30 分钟）。
@@ -55,7 +56,11 @@ open class CompanionKeepAliveService : Service() {
             if (!hasActiveYandere) {
                 YandereMessageWorker.schedule(applicationContext)
             }
+          } catch (_: Throwable) {
+            // 心跳在主线程执行，任何异常都不能让 App 崩溃；下一轮再试
+          } finally {
             handler.postDelayed(this, 60 * 60 * 1000L) // 60 分钟（原 15 分钟过于频繁）
+          }
         }
     }
 
@@ -73,7 +78,14 @@ open class CompanionKeepAliveService : Service() {
             stopRequested = true
         }
         val notification = createNotification()
-        startForeground(NOTIFICATION_ID, notification)
+        // 后台被拉起时系统可能拒绝前台服务（Android 12+/14+/15 的限制），直接抛异常会让整个 App 闪退。
+        // 失败就停掉自己，由 WorkManager 兜底，不崩溃。
+        try {
+            startForeground(NOTIFICATION_ID, notification)
+        } catch (_: Exception) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
         return START_STICKY
     }
 
@@ -105,7 +117,8 @@ open class CompanionKeepAliveService : Service() {
         // 超时由 onTimeout 路径已调度 WorkManager 兜底；
         // 用户主动 stop（stopRequested=true）则不自重启，尊重用户意图。
         if (!timedOut && !stopRequested) {
-            start(applicationContext)
+            // 服务销毁时 App 往往已在后台，直接 start 可能被系统拒绝并抛异常 → 用带保护的版本
+            safeStart(applicationContext)
         }
     }
 
@@ -113,7 +126,7 @@ open class CompanionKeepAliveService : Service() {
         super.onTaskRemoved(rootIntent)
         // [M10 FIX] 任务移除时若用户已主动停止，也不自重启
         if (!stopRequested) {
-            start(applicationContext)
+            safeStart(applicationContext)
         }
     }
 
