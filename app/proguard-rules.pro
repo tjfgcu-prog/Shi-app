@@ -73,19 +73,6 @@
 
 # symbols. Keep class names, member names, and descriptors intact.
 
-# ================================================================
-# Google AI Edge LiteRT-LM (litertlm-android) — CRITICAL
-# ================================================================
-# R8 does NOT understand native library loading side effects and WILL:
-#   1. Strip System.loadLibrary() calls from static initializers
-#   2. Rename JNI classes → native method names in .so won't match
-#   3. Remove "unused" native methods
-# This causes: No implementation found → SIGILL → instant crash.
-# Keep ALL litertlm classes, members, and native method signatures intact.
--keep,includedescriptorclasses class com.google.ai.edge.litertlm.** { *; }
--keep,includedescriptorclasses class com.google.ai.edge.litertlm.NativeLibraryLoader { *; }
--keep,includedescriptorclasses class com.google.ai.edge.litertlm.LiteRtLmJni { *; }
-
 # Prevent R8 from stripping System.loadLibrary calls in static initializers.
 # Even with -keep, R8 may optimize away side-effect-free-looking code paths
 # that include loadLibrary. This directive preserves all native method stubs.
@@ -128,8 +115,10 @@
 
 # Third-party SDKs that use reflection/native loading.
 
--keep class com.fasterxml.jackson.** { *; }
--dontwarn com.fasterxml.jackson.**
+# JNI 会按名字回调 Java 方法/读取字段：这三个库混淆后会直接崩溃
+-keep class com.k2fsa.sherpa.onnx.** { *; }
+-keep class org.nehuatl.llamacpp.** { *; }
+-keep class ai.onnxruntime.** { *; }
 -dontwarn org.slf4j.**
 -dontwarn ch.qos.logback.**
 -dontwarn okhttp3.**
