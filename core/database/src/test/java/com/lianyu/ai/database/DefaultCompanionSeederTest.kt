@@ -68,10 +68,7 @@ class DefaultCompanionSeederTest {
 
         override suspend fun deleteCompanion(companion: CompanionEntity): Int = 0
 
-        override suspend fun updateTimestamp(id: Long, timestamp: Long): Int = 0
 
-        override suspend fun increaseIntimacy(id: Long, amount: Int): Int = 0
 
-        override suspend fun getIntimacy(id: Long): Int? = null
     }
 }
