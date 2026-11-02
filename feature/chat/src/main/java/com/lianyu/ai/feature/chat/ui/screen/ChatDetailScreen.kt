@@ -69,12 +69,17 @@ import com.lianyu.ai.uicommon.component.getChatBackgroundKey
 @Composable
 fun ChatDetailScreen(
     companionId: Long,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    // 传入聊天页的 ViewModelStoreOwner 即可复用同一个 ChatViewModel，
+    // 避免打开详情页时再整套创建一遍（Room 监听、消息消费协程、用户资料等）
+    chatViewModelStoreOwner: androidx.lifecycle.ViewModelStoreOwner? = null
 ) {
     val context = LocalContext.current
     val store = remember { ChatDetailSettingsStore(context) }
     val scope = rememberCoroutineScope()
     val viewModel: ChatViewModel = viewModel(
+        viewModelStoreOwner = chatViewModelStoreOwner
+            ?: checkNotNull(androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner.current),
         factory = ChatViewModelFactory(context.applicationContext as Application, companionId)
     )
     val companionData by viewModel.companionData.collectAsState()

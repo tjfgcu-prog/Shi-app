@@ -137,7 +137,6 @@ import com.lianyu.ai.uicommon.component.rememberBackgroundBitmap
 
 import com.lianyu.ai.uicommon.theme.rememberAdaptiveSizing
 import com.lianyu.ai.common.ReadStatusManager
-import com.lianyu.ai.common.HardwareInfo
 import kotlinx.coroutines.Dispatchers
 
 import kotlinx.coroutines.launch
@@ -232,7 +231,6 @@ fun ChatScreen(
         ThemeMode.DARK -> true
         ThemeMode.SYSTEM -> isSystemInDarkTheme()
     }
-    val perfTier = remember { HardwareInfo.tier }
     val adaptiveSizing = rememberAdaptiveSizing()
 
     // Per-companion chat settings
@@ -396,13 +394,6 @@ fun ChatScreen(
         MaterialTheme.colorScheme.background
     } else {
         chatBgColor
-    }
-
-    val glassIntensity = when (perfTier) {
-        HardwareInfo.Tier.ULTRA -> 1.0f
-        HardwareInfo.Tier.HIGH -> 0.85f
-        HardwareInfo.Tier.MEDIUM -> 0.5f
-        HardwareInfo.Tier.LOW -> 0.2f
     }
 
     var showStickerPanel by remember { mutableStateOf(false) }
