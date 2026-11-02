@@ -108,15 +108,6 @@ object ServiceRegistry {
     }
 
     /**
-     * 移除指定类型的服务注册（含单例缓存）。
-     */
-    fun <T : Any> unregister(type: Class<T>) {
-        factories.remove(type)
-        singletonFactories.remove(type)
-        singletons.remove(type)
-    }
-
-    /**
      * 清空所有注册项与单例缓存。仅在 Application.onTerminate 调用。
      */
     fun clear() {

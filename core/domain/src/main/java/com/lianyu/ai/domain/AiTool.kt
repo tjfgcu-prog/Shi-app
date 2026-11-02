@@ -41,11 +41,6 @@ object ToolRegistry {
         tools[tool.name] = tool
     }
 
-    /** 注销工具 */
-    fun unregister(name: String) {
-        tools.remove(name)
-    }
-
     /** 按名查找工具 */
     fun get(name: String): AiTool? = tools[name]
 
