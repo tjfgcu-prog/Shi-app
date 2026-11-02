@@ -743,26 +743,6 @@ class GroupChatViewModel(
         )
     }
 
-    fun triggerAiSpeak(companionId: Long) {
-        applicationScope.launch {
-            try {
-                val group = _groupData.value
-                    ?: throw IllegalStateException("Group data is null")
-                val companion = _allCompanions.value.find { it.id == companionId }
-                    ?: throw IllegalStateException("Companion not found: $companionId")
-                val activeCompanionIds = group.getCompanionIdList()
-                val activeCompanions = _allCompanions.value.filter { activeCompanionIds.contains(it.id) }
-
-                val aiContent = generateAiReply(companion, activeCompanions, getRecentHistorySnapshot())
-                if (aiContent.isNotBlank()) {
-                    sendSplitAiMessages(aiContent, groupId, companion.id)
-                }
-            } catch (e: Exception) {
-                Log.e("GroupChatViewModel", "triggerAiSpeak failed", e)
-            }
-        }
-    }
-
     fun recallMessage(message: GroupMessage) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
