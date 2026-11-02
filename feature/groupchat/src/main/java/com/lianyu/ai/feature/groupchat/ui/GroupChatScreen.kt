@@ -119,7 +119,6 @@ import com.lianyu.ai.uicommon.component.ChatTimeDivider
 import com.lianyu.ai.common.ChatConstants
 import com.lianyu.ai.feature.groupchat.GroupChatViewModel
 import com.lianyu.ai.feature.groupchat.GroupChatViewModelFactory
-import com.lianyu.ai.common.HardwareInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -159,7 +158,6 @@ fun GroupChatScreen(
         ThemeMode.DARK -> true
         ThemeMode.SYSTEM -> systemInDarkTheme
     }
-    val perfTier = remember { HardwareInfo.tier }
 
     var showExtensionPanel by remember { mutableStateOf(false) }
     var showStickerPanel by remember { mutableStateOf(false) }
@@ -271,13 +269,6 @@ fun GroupChatScreen(
 
     val chatBgColor by animateColorAsState(targetBgColor, tween(300), label = "bgColor")
     val backgroundColor = if (isDarkTheme) MaterialTheme.colorScheme.background else chatBgColor
-
-    val glassIntensity = when (perfTier) {
-        HardwareInfo.Tier.ULTRA -> 1.0f
-        HardwareInfo.Tier.HIGH -> 0.85f
-        HardwareInfo.Tier.MEDIUM -> 0.5f
-        HardwareInfo.Tier.LOW -> 0.2f
-    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         SnackbarHost(
