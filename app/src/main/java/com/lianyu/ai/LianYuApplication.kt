@@ -60,6 +60,7 @@ class LianYuApplication : Application(), ImageLoaderFactory, androidx.work.Confi
         java.security.Security.setProperty("networkaddress.cache.ttl", "0")
         java.security.Security.setProperty("networkaddress.cache.negative.ttl", "0")
         super.onCreate()
+        installCrashRecorder()
         instance = this
         // 新进程启动 = 本地模型一定不在内存里：把开关复位为关，保证开关等于"模型是否真的在运行"
         getSharedPreferences("gguf_model_prefs", MODE_PRIVATE).edit().putBoolean("gguf_enabled", false).apply()
@@ -70,6 +71,39 @@ class LianYuApplication : Application(), ImageLoaderFactory, androidx.work.Confi
         try {
             java.io.File(cacheDir, "media_plain").deleteRecursively()
         } catch (_: Exception) { }
+    }
+
+    /**
+     * [诊断] 记录未捕获的 Java/Kotlin 异常：写进 files/chatvm_debug.log，以 [CRASH] 开头。
+     * 只记异常类型 + 栈帧（类名/方法/行号），不记异常文字描述（可能带聊天内容）。
+     * 记完后原样交还给系统默认处理，App 的闪退行为不变。
+     * release 包的类名是压缩过的，需配合 CI 上传的 mapping.txt 还原。
+     */
+    private fun installCrashRecorder() {
+        val previous = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, error ->
+            runCatching {
+                val sb = StringBuilder()
+                val fmt = java.text.SimpleDateFormat("MM-dd HH:mm:ss", Locale.US)
+                sb.append(fmt.format(java.util.Date())).append(" [CRASH] thread=").append(thread.name)
+                    .append(" ").append(error.javaClass.name).append('\n')
+                var cur: Throwable? = error
+                var depth = 0
+                while (cur != null && depth < 3) {
+                    if (depth > 0) sb.append("  Caused by ").append(cur.javaClass.name).append('\n')
+                    for (el in cur.stackTrace.take(if (depth == 0) 14 else 10)) {
+                        sb.append("    at ").append(el.className).append('.').append(el.methodName)
+                            .append('(').append(el.fileName ?: "?").append(':').append(el.lineNumber).append(")\n")
+                    }
+                    cur = cur.cause
+                    depth++
+                }
+                val logFile = java.io.File(filesDir, "chatvm_debug.log")
+                if (logFile.exists() && logFile.length() > 2L * 1024 * 1024) logFile.delete()
+                logFile.appendText(sb.toString())
+            }
+            previous?.uncaughtException(thread, error)
+        }
     }
 
     /**
