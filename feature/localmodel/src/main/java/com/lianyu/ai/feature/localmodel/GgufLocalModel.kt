@@ -28,7 +28,13 @@ class GgufLocalModel(context: Context) {
     private val appContext = context.applicationContext
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
+    // 只在可调试（debug）包里写诊断日志：以前每个 token 都会打开/追加/关闭一次文件，
+    // 而且 release 包里也在写（还把 AI 生成的每个字明文落盘）。
+    private val debuggable =
+        (appContext.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
+
     private fun logD(msg: String) {
+        if (!debuggable) return
         try {
             val f = File(appContext.filesDir, "chatvm_debug.log")
             f.appendText("${System.currentTimeMillis()} [GgufLocalModel] $msg\n")
@@ -182,17 +188,23 @@ class GgufLocalModel(context: Context) {
             status = LocalModelStatus.Generating(loadedContextLength, loadMs)
             try {
                 val builder = StringBuilder()
+                val startedAt = System.currentTimeMillis()
+                var firstTokenAt = 0L
+                var tokenCount = 0
                 suspendCancellableCoroutine<String> { cont ->
                     lateinit var collectJob: Job
                     collectJob = scope.launch {
                         llmFlow.collect { event ->
                             when (event) {
                                 is LlamaHelper.LLMEvent.Ongoing -> {
-                                    logD("event: Ongoing, word='${event.word}'")
+                                    if (firstTokenAt == 0L) firstTokenAt = System.currentTimeMillis()
+                                    tokenCount++
                                     builder.append(event.word)
                                 }
                                 is LlamaHelper.LLMEvent.Done -> {
-                                    logD("event: Done, totalLength=${builder.length}")
+                                    val now = System.currentTimeMillis()
+                                    logD("event: Done, totalLength=${builder.length}, tokens=$tokenCount, " +
+                                        "firstToken=${if (firstTokenAt > 0) firstTokenAt - startedAt else -1}ms, total=${now - startedAt}ms")
                                     if (cont.isActive) cont.resume(builder.toString())
                                     collectJob.cancel()
                                 }
