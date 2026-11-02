@@ -21,8 +21,9 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Generate matching debug keystore
-        run: keytool -genkeypair -v -keystore release.keystore -alias your_alias -keyalg RSA -keysize 2048 -validity 10000 -storepass 3498762309 -keypass 3498762309 -dname "CN=LianYu Dev, OU=Dev, O=Dev, L=Dev, S=Dev, C=CN"
+      # 使用仓库根目录里固定的 release.keystore：每次构建签名一致，才能直接覆盖安装升级（不用卸载、不丢数据）
+      - name: Check signing keystore
+        run: test -f release.keystore || (echo "仓库根目录缺少 release.keystore，请先上传" && exit 1)
 
       - name: Build Debug APK
         run: ./gradlew assembleDebug
