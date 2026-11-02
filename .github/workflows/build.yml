@@ -21,10 +21,6 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-
       - name: Generate matching debug keystore
         run: keytool -genkeypair -v -keystore release.keystore -alias your_alias -keyalg RSA -keysize 2048 -validity 10000 -storepass 3498762309 -keypass 3498762309 -dname "CN=LianYu Dev, OU=Dev, O=Dev, L=Dev, S=Dev, C=CN"
 
@@ -36,3 +32,17 @@ jobs:
         with:
           name: app-debug-apk
           path: app/build/outputs/apk/debug/*.apk
+
+      # Release 包：开启 R8 代码压缩 + 资源压缩、关闭调试开销，日常使用明显更流畅。
+      # 放在 Debug 之后并允许失败，这样即使 release 出问题也不影响上面的 Debug 包。
+      - name: Build Release APK
+        id: release
+        continue-on-error: true
+        run: ./gradlew assembleRelease
+
+      - name: Upload Release APK
+        if: steps.release.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apk
+          path: app/build/outputs/apk/release/*.apk
