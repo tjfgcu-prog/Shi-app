@@ -72,29 +72,10 @@ object BatteryOptimizationHelper {
     }
 
     /**
-     * 打开后台高耗电 / 耗电保护 / 神隐模式等设置页。
-     * OPPO / vivo 使用专门适配路径。
-     */
-    fun openBackgroundPowerSettings(context: Context) {
-        if (RomUtils.isOppoOrVivo()) {
-            OppoVivoAdaptationHelper.openBackgroundPowerSettings(context)
-            return
-        }
-        openAppDetailsSettings(context)
-    }
-
-    /**
      * 打开应用详情页（通用兜底）。
      */
     fun openAppDetailsSettings(context: Context) {
         OppoVivoAdaptationHelper.openAppDetailsSettings(context)
-    }
-
-    /**
-     * 打开通知设置页。
-     */
-    fun openNotificationSettings(context: Context) {
-        OppoVivoAdaptationHelper.openNotificationSettings(context)
     }
 
     private fun safeStartActivity(context: Context, intent: Intent) {

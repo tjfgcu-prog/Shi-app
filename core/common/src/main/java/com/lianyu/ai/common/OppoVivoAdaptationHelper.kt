@@ -61,23 +61,6 @@ object OppoVivoAdaptationHelper {
     }
 
     /**
-     * 打开通知设置页。
-     */
-    fun openNotificationSettings(context: Context) {
-        val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
-                putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
-            }
-        } else {
-            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                data = Uri.parse("package:${context.packageName}")
-            }
-        }
-        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-        safeStartActivity(context, intent)
-    }
-
-    /**
      * 打开自启动 / 应用启动管理设置页。
      *
      * ColorOS 12+：设置 → 应用 → 自启动管理
@@ -87,54 +70,6 @@ object OppoVivoAdaptationHelper {
         val candidates = when {
             RomUtils.isOppo -> getOppoAutoStartCandidates()
             RomUtils.isVivo -> getVivoAutoStartCandidates()
-            else -> emptyList()
-        }
-
-        val component = RomUtils.findAvailableComponent(context, candidates)
-        val intent = if (component != null) {
-            Intent().setComponent(component)
-        } else {
-            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                data = Uri.parse("package:${context.packageName}")
-            }
-        }
-        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-        safeStartActivity(context, intent)
-    }
-
-    /**
-     * 打开后台高耗电 / 耗电保护管理页。
-     *
-     * ColorOS：手机管家 → 权限隐私 → 后台自启 / 耗电保护
-     * OriginOS：i管家 → 电池管理 → 后台高耗电
-     */
-    fun openBackgroundPowerSettings(context: Context) {
-        val candidates = when {
-            RomUtils.isOppo -> getOppoBackgroundPowerCandidates()
-            RomUtils.isVivo -> getVivoBackgroundPowerCandidates()
-            else -> emptyList()
-        }
-
-        val component = RomUtils.findAvailableComponent(context, candidates)
-        val intent = if (component != null) {
-            Intent().setComponent(component)
-        } else {
-            openAppDetailsSettings(context)
-            return
-        }
-        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-        safeStartActivity(context, intent)
-    }
-
-    /**
-     * 打开后台弹出界面 / 悬浮窗权限设置页。
-     *
-     * 在 OPPO/vivo 上，锁屏或后台弹通知时可能需要此权限。
-     */
-    fun openBackgroundPopupSettings(context: Context) {
-        val candidates = when {
-            RomUtils.isOppo -> getOppoBackgroundPopupCandidates()
-            RomUtils.isVivo -> getVivoBackgroundPopupCandidates()
             else -> emptyList()
         }
 
@@ -176,44 +111,6 @@ object OppoVivoAdaptationHelper {
         "com.iqoo.secure" to "com.iqoo.secure.ui.phoneoptimize.BgStartUpManager",
         // 部分 vivo 机型
         "com.vivo.abe" to "com.vivo.abe.ui.ExActivity"
-    )
-
-    private fun getOppoBackgroundPowerCandidates(): List<Pair<String, String>> = listOf(
-        // ColorOS 12+ 耗电保护
-        "com.coloros.safecenter" to "com.coloros.safecenter.powermanager.PowerConsumptionActivity",
-        // ColorOS 13+ 新版
-        "com.oplus.battery" to "com.oplus.battery.CompeletePowerControlActivity",
-        // Realme
-        "com.realme.safecenter" to "com.realme.safecenter.power.PowerConsumptionActivity",
-        // 旧版
-        "com.oppo.safe" to "com.oppo.safe.power.PowerConsumptionActivity"
-    )
-
-    private fun getVivoBackgroundPowerCandidates(): List<Pair<String, String>> = listOf(
-        // i管家 → 电池管理 → 后台高耗电
-        "com.iqoo.secure" to "com.iqoo.secure.safecenter.GuidePageActivity",
-        // 旧版
-        "com.vivo.abe" to "com.vivo.abe.MainActivity",
-        // 权限管理 → 耗电管理
-        "com.vivo.permissionmanager" to "com.vivo.permissionmanager.activity.PurviewTabActivity"
-    )
-
-    private fun getOppoBackgroundPopupCandidates(): List<Pair<String, String>> = listOf(
-        // ColorOS 悬浮窗管理
-        "com.coloros.safecenter" to "com.coloros.safecenter.permission.floatwindow.FloatWindowListActivity",
-        // 新版
-        "com.oplus.safecenter" to "com.oplus.safecenter.permission.floatwindow.FloatWindowListActivity",
-        // 旧版
-        "com.oppo.safe" to "com.oppo.safe.permission.PermissionTopActivity"
-    )
-
-    private fun getVivoBackgroundPopupCandidates(): List<Pair<String, String>> = listOf(
-        // 后台弹出界面
-        "com.vivo.permissionmanager" to "com.vivo.permissionmanager.activity.KeepBGActivity",
-        // iQOO
-        "com.iqoo.secure" to "com.iqoo.secure.safecenter.KeepBGActivity",
-        // 旧版
-        "com.vivo.abe" to "com.vivo.abe.activity.KeepBGActivity"
     )
 
     private fun safeStartActivity(context: Context, intent: Intent) {
