@@ -10,5 +10,4 @@ import okhttp3.CertificatePinner
  */
 object CertificatePins {
     val certificatePinner: CertificatePinner = CertificatePinner.DEFAULT
-    val PINNER: CertificatePinner = certificatePinner
 }
