@@ -32,12 +32,4 @@ interface CompanionDao {
     @Delete
     suspend fun deleteCompanion(companion: CompanionEntity): Int
 
-    @Query("UPDATE companions SET updatedAt = :timestamp WHERE id = :id")
-    suspend fun updateTimestamp(id: Long, timestamp: Long = System.currentTimeMillis()): Int
-
-    @Query("UPDATE companions SET intimacy = intimacy + :amount WHERE id = :id")
-    suspend fun increaseIntimacy(id: Long, amount: Int = 1): Int
-
-    @Query("SELECT intimacy FROM companions WHERE id = :id")
-    suspend fun getIntimacy(id: Long): Int?
 }

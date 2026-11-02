@@ -14,9 +14,6 @@ interface ApiConfigDao {
     @Query("SELECT * FROM api_configs ORDER BY id DESC")
     fun getAllConfigs(): Flow<List<ApiConfig>>
 
-    @Query("SELECT * FROM api_configs WHERE provider = :provider ORDER BY id DESC")
-    fun getConfigsByProvider(provider: ApiProvider): Flow<List<ApiConfig>>
-
     @Query("SELECT * FROM api_configs WHERE id = :id")
     suspend fun getConfigById(id: Long): ApiConfig?
 

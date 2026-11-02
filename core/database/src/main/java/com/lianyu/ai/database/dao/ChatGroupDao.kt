@@ -20,9 +20,6 @@ interface ChatGroupDao {
     @Query("SELECT * FROM chat_groups WHERE id = :id")
     suspend fun getGroupById(id: Long): ChatGroup?
 
-    @Query("SELECT * FROM chat_groups WHERE id = :id")
-    fun getGroupByIdFlow(id: Long): Flow<ChatGroup?>
-
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertGroup(group: ChatGroup): Long
 
@@ -32,6 +29,4 @@ interface ChatGroupDao {
     @Delete
     suspend fun deleteGroup(group: ChatGroup): Int
 
-    @Query("UPDATE chat_groups SET updatedAt = :timestamp WHERE id = :id")
-    suspend fun updateTimestamp(id: Long, timestamp: Long = System.currentTimeMillis()): Int
 }

@@ -11,24 +11,12 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface GroupMessageDao {
-    // Cursor pagination: read messages older than a millisecond timestamp.
-    @Query("SELECT * FROM group_messages WHERE groupId = :groupId AND timestamp < :beforeTimestamp ORDER BY timestamp DESC LIMIT :limit")
-    fun getMessagesBefore(groupId: Long, beforeTimestamp: Long, limit: Int): Flow<List<GroupMessage>>
 
     @Query("SELECT * FROM group_messages WHERE groupId = :groupId AND timestamp < :beforeTimestamp ORDER BY timestamp DESC LIMIT :limit")
     suspend fun getMessagesBeforeSync(groupId: Long, beforeTimestamp: Long, limit: Int): List<GroupMessage>
 
     @Query("SELECT * FROM group_messages WHERE groupId = :groupId ORDER BY timestamp DESC LIMIT :limit")
     fun getRecentMessagesForGroup(groupId: Long, limit: Int): Flow<List<GroupMessage>>
-
-    @Query("SELECT * FROM group_messages WHERE groupId = :groupId ORDER BY timestamp DESC LIMIT 1")
-    fun getLastMessageForGroup(groupId: Long): Flow<GroupMessage?>
-
-    @Query("SELECT * FROM group_messages WHERE groupId = :groupId AND searchContent LIKE '%' || :query || '%' ORDER BY timestamp DESC LIMIT :limit")
-    suspend fun searchMessages(groupId: Long, query: String, limit: Int): List<GroupMessage>
-
-    @Query("SELECT * FROM group_messages WHERE groupId = :groupId AND fileFormat = :fileFormat ORDER BY timestamp DESC LIMIT :limit")
-    suspend fun getMessagesByFileFormat(groupId: Long, fileFormat: FileFormat, limit: Int): List<GroupMessage>
 
     @Query("SELECT * FROM group_messages WHERE groupId = :groupId AND fileFormat = :fileFormat AND timestamp < :beforeTimestamp ORDER BY timestamp DESC LIMIT :limit")
     suspend fun getMessagesByFileFormatBefore(groupId: Long, fileFormat: FileFormat, beforeTimestamp: Long, limit: Int): List<GroupMessage>
