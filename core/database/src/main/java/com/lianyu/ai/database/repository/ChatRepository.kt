@@ -31,10 +31,6 @@ class ChatRepository(private val chatMessageDao: ChatMessageDao) {
             .map { list -> list.map { ChatMessageCrypto.decryptFromStorage(it) }.reversed() }
             .onEach { decrypted -> recentCache[companionId] = decrypted }
 
-    fun getMessagesBefore(companionId: Long, beforeTimestamp: Long, limit: Int = 200): Flow<List<ChatMessage>> =
-        chatMessageDao.getMessagesBefore(companionId, beforeTimestamp, limit)
-            .map { list -> list.map { ChatMessageCrypto.decryptFromStorage(it) }.reversed() }
-
     fun getLastMessageForCompanion(companionId: Long): Flow<ChatMessage?> =
         chatMessageDao.getLastMessageForCompanion(companionId)
             .map { it?.let(ChatMessageCrypto::decryptFromStorage) }
@@ -49,13 +45,11 @@ class ChatRepository(private val chatMessageDao: ChatMessageDao) {
         recentCache.remove(companionId)
     }
 
-    suspend fun getAiMessageCount(companionId: Long): Int = chatMessageDao.getAiMessageCount(companionId)
-
     // [BUGFIX] chatMessageDao.getRecentMessagesSync 按 timestamp DESC（新→旧）查询，
     // 但本函数此前直接把 DESC 结果返回给调用方，只把 reversed() 之后的正序副本存进了
     // UI 内存缓存（recentCache）。而 ChatContextResolver.getHistoryForAi()/
     // getShortHistoryForAi()、以及最终喂给 AiPromptBuilder 的历史消息列表都假设本函数
-    // 返回时间正序（旧→新，与 getMessagesForCompanion/getMessagesBefore 的约定一致）。
+    // 返回时间正序（旧→新，与 getMessagesForCompanion 的约定一致）。
     suspend fun getRecentMessagesSync(companionId: Long, limit: Int): List<ChatMessage> =
         chatMessageDao.getRecentMessagesSync(companionId, limit)
             .map { ChatMessageCrypto.decryptFromStorage(it) }
@@ -68,14 +62,6 @@ class ChatRepository(private val chatMessageDao: ChatMessageDao) {
 
     suspend fun getMessagesForCompanionSync(companionId: Long): List<ChatMessage> =
         chatMessageDao.getMessagesForCompanionSync(companionId)
-            .map { ChatMessageCrypto.decryptFromStorage(it) }
-
-    suspend fun searchMessages(companionId: Long, query: String, limit: Int = 50): List<ChatMessage> =
-        chatMessageDao.searchMessages(companionId, query, limit)
-            .map { ChatMessageCrypto.decryptFromStorage(it) }
-
-    suspend fun getMessagesByFileFormat(companionId: Long, fileFormat: FileFormat, limit: Int = 50): List<ChatMessage> =
-        chatMessageDao.getMessagesByFileFormat(companionId, fileFormat, limit)
             .map { ChatMessageCrypto.decryptFromStorage(it) }
 
     suspend fun getMessagesByFileFormatBefore(
@@ -91,16 +77,9 @@ class ChatRepository(private val chatMessageDao: ChatMessageDao) {
         return chatMessageDao.insertMessage(ChatMessageCrypto.encryptForStorage(message))
     }
 
-    suspend fun updateMessageContent(messageId: Long, content: String) {
-        // [C3 FIX] 必须加密 content 列：sendMessage / sendMessageAndGetId 都会经过 ChatMessageCrypto.encryptForStorage，
-        // 但此处的直接 UPDATE 之前传明文，导致 content 列在流式更新路径上绕过加密层。
-        // searchContent 保持明文以支持 LIKE 查询（与 encryptForStorage 中 searchContent 的处理一致）。
-        chatMessageDao.updateMessageContent(messageId, ChatMessageCrypto.encrypt(content), content)
-    }
-
     /**
      * 把一条已发送的文字消息原地升级为语音消息（TTS 异步合成完成后调用）。
-     * content 同样需要加密存储，跟 updateMessageContent 保持一致。
+     * content 同样需要加密存储（与 ChatMessageCrypto.encrypt 保持一致）。
      */
     suspend fun updateMessageAsVoice(messageId: Long, displayContent: String, linkString: String) {
         chatMessageDao.updateMessageAsVoice(

@@ -113,45 +113,12 @@ class TokenUsageRepository(context: Context) {
         }
     }
 
-    suspend fun getUsageByDateRange(startDate: String, endDate: String, companionId: Long? = null): List<TokenUsage> = withContext(Dispatchers.IO) {
-        try {
-            dao.getUsageByDateRange(deviceId, startDate, endDate, companionId, companionId == null || companionId == -1L)
-        } catch (e: Exception) {
-            SecureLog.e("TokenUsage", "Failed to get usage by date range", e)
-            emptyList()
-        }
-    }
-
-    suspend fun getUsageByCompanion(companionId: Long, limit: Int = 30): List<TokenUsage> = withContext(Dispatchers.IO) {
-        try {
-            dao.getUsageByCompanion(companionId, deviceId, limit)
-        } catch (e: Exception) {
-            SecureLog.e("TokenUsage", "Failed to get usage by companion", e)
-            emptyList()
-        }
-    }
-
     suspend fun getAllUsageHistory(limit: Int = 30): List<TokenUsage> = withContext(Dispatchers.IO) {
         try {
             dao.getUsageSince(deviceId, getDateDaysAgo(limit))
         } catch (e: Exception) {
             SecureLog.e("TokenUsage", "Failed to get all usage history", e)
             emptyList()
-        }
-    }
-
-    suspend fun deleteOldRecords(daysToKeep: Int = 90): Int = withContext(Dispatchers.IO) {
-        try {
-            calendar.time = Date()
-            calendar.add(Calendar.DAY_OF_YEAR, -daysToKeep)
-            val cutoffTimestamp = calendar.timeInMillis
-            
-            val deletedCount = dao.deleteOldRecords(deviceId, cutoffTimestamp)
-            SecureLog.i("TokenUsage", "Deleted $deletedCount old records older than $daysToKeep days")
-            deletedCount
-        } catch (e: Exception) {
-            SecureLog.e("TokenUsage", "Failed to delete old records", e)
-            0
         }
     }
 

@@ -20,11 +20,6 @@ class ApiConfigRepository(
         list.mapNotNull { decryptForUse(it, secretCodec) }
     }
 
-    fun getConfigsByProvider(provider: ApiProvider): Flow<List<ApiConfig>> = 
-        apiConfigDao.getConfigsByProvider(provider).map { list ->
-            list.mapNotNull { decryptForUse(it, secretCodec) }
-        }
-
     suspend fun getConfigById(id: Long): ApiConfig? =
         apiConfigDao.getConfigById(id)?.let { decryptAndMigrateIfNeeded(it) }
 
