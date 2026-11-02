@@ -1,12 +1,8 @@
 <resources>
     <!-- Language Screen -->
-    
-    <string name="cd_back">返回</string>
+     <string name="cd_back">返回</string>
     <string name="cd_selected">已选中</string>
     <string name="back">返回</string>
-
-    <!-- Experimental Features -->
-    
 
     <!-- Theme Screen -->
     <string name="theme_title">主题模式</string>
@@ -18,22 +14,12 @@
     <string name="theme_system_desc">自动切换浅色/深色</string>
 
     <!-- Settings Screen -->
-    
     <string name="settings_hint">点击展开配置API，测试连接成功后显示已接入</string>
-    <string name="configured">已配置</string>
     
-    <string name="model">模型</string>
-    <string name="temperature">温度</string>
-    <string name="max_tokens">最大Token数 (可选)</string>
-    
-
     <!-- Frame Rate Screen -->
     <string name="framerate_title">帧率设置</string>
     <string name="screen_refresh_rate">屏幕刷新率</string>
     <string name="framerate_hint">选择自动模式将根据设备性能自动匹配最佳帧率。高帧率可能增加电量消耗。</string>
-
-    <!-- Check Update Screen -->
-    
 
     <!-- Yandere Mode Screen -->
     <string name="yandere_mode">病娇模式</string>
