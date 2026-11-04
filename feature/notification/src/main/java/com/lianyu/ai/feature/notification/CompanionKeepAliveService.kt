@@ -91,8 +91,20 @@ open class CompanionKeepAliveService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    // Android 15（API 35）起，dataSync 前台服务连续运行 6 小时会收到「两个参数」的 onTimeout(startId, fgsType)，
+    // 必须在几秒内 stopSelf，否则系统抛 ForegroundServiceDidNotStopInTimeException 让整个 App 闪退。
+    // 以前只重写了单参数版本（它只对 shortService 类型生效），所以 dataSync 的超时没人处理 → 6 小时后崩溃。
+    override fun onTimeout(startId: Int, fgsType: Int) {
+        handleForegroundTimeout(startId)
+    }
+
+    // 单参数版本保留（Android 14 的 shortService 超时仍会走这里）
     override fun onTimeout(startId: Int) {
         super.onTimeout(startId)
+        handleForegroundTimeout(startId)
+    }
+
+    private fun handleForegroundTimeout(startId: Int) {
         timedOut = true
         // Android 15 前台服务 6 小时超时：必须先 stopForeground 再 stopSelf，
         // 否则 ColorOS / OriginOS 等激进 ROM 可能抛出异常或直接拒绝重启。
