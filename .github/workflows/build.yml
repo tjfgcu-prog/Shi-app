@@ -48,6 +48,32 @@ jobs:
           name: app-release-apk
           path: app/build/outputs/apk/release/*.apk
 
+      # 只读诊断：把 llama 库的方法签名打印出来，用来确认"大模型线程数"能不能设置。不影响 App。
+      - name: Inspect llama library API (diagnostic)
+        continue-on-error: true
+        run: |
+          AAR=$(find ~/.gradle -name 'llamacpp-kotlin*.aar' | head -1)
+          echo "AAR=$AAR"
+          mkdir -p /tmp/llama && cd /tmp/llama
+          unzip -q -o "$AAR" && unzip -q -o classes.jar -d cls
+          : > /tmp/llama-api.txt
+          for c in $(cd cls && find . -name '*.class' | sed 's#^\./##; s#\.class$##; s#/#.#g' | grep -v '\$' | sort); do
+            echo "=== $c" >> /tmp/llama-api.txt
+            javap -p -cp cls "$c" >> /tmp/llama-api.txt
+          done
+          echo "---- thread related ----"
+          grep -n -i "thread" /tmp/llama-api.txt || echo "(no thread-related member found)"
+          echo "---- LlamaHelper ----"
+          awk '/^=== .*LlamaHelper/{f=1} f{print} /^}/{if(f) exit}' /tmp/llama-api.txt
+
+      - name: Upload llama API listing
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: llama-api
+          path: /tmp/llama-api.txt
+          if-no-files-found: ignore
+
       # R8 混淆映射表：release 包闪退的堆栈靠它还原成真实类名，请保留
       - name: Upload R8 mapping
         if: steps.release.outcome == 'success'
