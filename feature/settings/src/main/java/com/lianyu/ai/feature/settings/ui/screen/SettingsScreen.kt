@@ -969,6 +969,61 @@ private fun GgufLocalModelSection(
 
         Spacer(modifier = Modifier.height(12.dp))
 
+        // 卡片2.5：线程数（语音合成 / 记忆向量）
+        var ttsThreads by remember { mutableStateOf(com.lianyu.ai.common.PerfPrefs.ttsThreads(context)) }
+        var embeddingThreads by remember { mutableStateOf(com.lianyu.ai.common.PerfPrefs.embeddingThreads(context)) }
+        val cpuCores = remember { com.lianyu.ai.common.PerfPrefs.cpuCores() }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "线程数（高级）",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = textPrimaryColor
+            )
+            Text(
+                text = "线程越多通常越快，但会和大模型抢 CPU、更耗电。本机共 $cpuCores 个核心。",
+                fontSize = 11.sp,
+                color = textSecondaryColor
+            )
+            Text(text = "语音合成线程（默认 2，下一句话生效）", fontSize = 12.sp, color = textSecondaryColor)
+            ThreadChipRow(
+                options = (1..cpuCores).toList().take(8),
+                selected = ttsThreads,
+                labelOf = { it.toString() },
+                textSecondaryColor = textSecondaryColor,
+                onSelect = {
+                    ttsThreads = it
+                    com.lianyu.ai.common.PerfPrefs.setTtsThreads(context, it)
+                }
+            )
+            Text(text = "记忆向量线程（默认自动，重启 App 后生效）", fontSize = 12.sp, color = textSecondaryColor)
+            ThreadChipRow(
+                options = listOf(0) + (1..cpuCores).toList().take(7),
+                selected = embeddingThreads,
+                labelOf = { if (it == 0) "自动" else it.toString() },
+                textSecondaryColor = textSecondaryColor,
+                onSelect = {
+                    embeddingThreads = it
+                    com.lianyu.ai.common.PerfPrefs.setEmbeddingThreads(context, it)
+                }
+            )
+            Text(
+                text = "大模型（Qwen）的线程数暂时不能设置：所用的 llama 库是否开放这个参数还在确认，确认后再加。",
+                fontSize = 11.sp,
+                color = textSecondaryColor
+            )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
         // 卡片3：查看调试日志
         Column(
             modifier = Modifier
@@ -1523,3 +1578,38 @@ fun ApiConfigEditDialog(
     )
 }
 
+
+
+/** 一排可选的线程数按钮（与"上下文长度"按钮同样式）。 */
+@Composable
+private fun ThreadChipRow(
+    options: List<Int>,
+    selected: Int,
+    labelOf: (Int) -> String,
+    textSecondaryColor: Color,
+    onSelect: (Int) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        options.forEach { option ->
+            val isSelected = selected == option
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (isSelected) PetalPrimary else MaterialTheme.colorScheme.surface)
+                    .clickable { onSelect(option) }
+                    .padding(vertical = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = labelOf(option),
+                    fontSize = 12.sp,
+                    color = if (isSelected) Color.White else textSecondaryColor
+                )
+            }
+        }
+    }
+}

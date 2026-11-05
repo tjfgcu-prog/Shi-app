@@ -77,6 +77,7 @@ fun TtsSettingsScreen(
     var minimaxVoiceId by remember { mutableStateOf(config.minimaxVoiceId) }
     var localTtsSpeed by remember { mutableStateOf(config.localTtsSpeed) }
     var localTtsSid by remember { mutableStateOf(config.localTtsSid) }
+    var minimaxEmotion by remember { mutableStateOf(config.minimaxEmotion) }
 
     val localTtsManager = remember { ttsService.localTtsManager }
     val localTtsState by localTtsManager.state.collectAsState()
@@ -104,7 +105,8 @@ fun TtsSettingsScreen(
             localTtsSid = localTtsSid,
             minimaxApiKey = minimaxApiKey,
             minimaxGroupId = minimaxGroupId,
-            minimaxVoiceId = minimaxVoiceId
+            minimaxVoiceId = minimaxVoiceId,
+            minimaxEmotion = minimaxEmotion
         )
         TtsConfig.saveToSharedPreferences(context, newConfig)
         ttsService.updateConfig(newConfig)
@@ -264,6 +266,8 @@ fun TtsSettingsScreen(
                                         apiKey = minimaxApiKey, onApiKeyChange = { minimaxApiKey = it },
                                         groupId = minimaxGroupId, onGroupIdChange = { minimaxGroupId = it },
                                         voiceId = minimaxVoiceId, onVoiceIdChange = { minimaxVoiceId = it; saveSettings() },
+                                        emotion = minimaxEmotion, onEmotionChange = { minimaxEmotion = it; saveSettings() },
+                                        speed = localTtsSpeed, onSpeedChange = { localTtsSpeed = it; saveSettings() },
                                         cardBg = cardBg, textPrimaryColor = textPrimaryColor, textSecondaryColor = textSecondaryColor
                                     )
                                 }
@@ -491,8 +495,19 @@ private fun CloudModeCard(
     apiKey: String, onApiKeyChange: (String) -> Unit,
     groupId: String, onGroupIdChange: (String) -> Unit,
     voiceId: String, onVoiceIdChange: (String) -> Unit,
+    emotion: String, onEmotionChange: (String) -> Unit,
+    speed: Float, onSpeedChange: (Float) -> Unit,
     cardBg: Color, textPrimaryColor: Color, textSecondaryColor: Color
 ) {
+    val emotions = listOf(
+        "" to "自动（推荐，按文本判断）",
+        "happy" to "开心",
+        "calm" to "平静",
+        "sad" to "悲伤",
+        "angry" to "生气",
+        "surprised" to "惊讶"
+    )
+    var showEmotionDropdown by remember { mutableStateOf(false) }
     val voices = listOf(
         "female-shaonv" to "少女音（漫剧女主，推荐）",
         "female-tianmei" to "甜美女声",
@@ -531,6 +546,31 @@ private fun CloudModeCard(
                 }
             }
         }
+        Text("情绪", fontSize = 13.sp, color = textSecondaryColor)
+        Box {
+            Row(
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surface)
+                    .clickable { showEmotionDropdown = true }.padding(12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(emotions.find { it.first == emotion }?.second ?: emotion, fontSize = 14.sp, color = textPrimaryColor)
+            }
+            DropdownMenu(expanded = showEmotionDropdown, onDismissRequest = { showEmotionDropdown = false }) {
+                emotions.forEach { (id, label) ->
+                    DropdownMenuItem(text = { Text(label, fontSize = 14.sp) }, onClick = { onEmotionChange(id); showEmotionDropdown = false })
+                }
+            }
+        }
+        var draftSpeed by remember(speed) { mutableFloatStateOf(speed) }
+        Text("语速: ${String.format("%.1f", draftSpeed)}", fontSize = 13.sp, color = textSecondaryColor)
+        Slider(
+            value = draftSpeed,
+            onValueChange = { draftSpeed = it },
+            onValueChangeFinished = { onSpeedChange(String.format("%.1f", draftSpeed).toFloat()) },
+            valueRange = 0.5f..2.0f, modifier = Modifier.fillMaxWidth(),
+            colors = SliderDefaults.colors(thumbColor = PetalPrimary, activeTrackColor = PetalPrimary)
+        )
     }
 }
 
