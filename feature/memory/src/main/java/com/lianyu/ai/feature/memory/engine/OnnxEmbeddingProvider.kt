@@ -1,6 +1,7 @@
 package com.lianyu.ai.feature.memory.engine
 
 import android.content.Context
+import com.lianyu.ai.common.PerfPrefs
 import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
@@ -18,7 +19,11 @@ class OnnxEmbeddingProvider(context: Context) : EmbeddingProvider {
     private val session: OrtSession? by lazy {
         runCatching {
             val modelBytes = appContext.assets.open("bge_small_zh_quantized.onnx").readBytes()
-            env.createSession(modelBytes, OrtSession.SessionOptions())
+            val options = OrtSession.SessionOptions()
+            // 线程数来自设置页（0 = 自动，交给 ONNX Runtime 决定）；引擎只加载一次，改完需重启 App 生效
+            val threads = PerfPrefs.embeddingThreads(appContext)
+            if (threads > 0) options.setIntraOpNumThreads(threads)
+            env.createSession(modelBytes, options)
         }.getOrNull()
     }
 
