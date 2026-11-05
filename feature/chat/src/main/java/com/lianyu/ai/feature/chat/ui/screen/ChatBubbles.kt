@@ -281,6 +281,7 @@ fun ChatBubble(
     
     onRecall: ((ChatMessage) -> Unit)? = null,
     onRegenerate: ((ChatMessage) -> Unit)? = null,
+    onResynthesizeVoice: ((ChatMessage) -> Unit)? = null,
     adaptiveSizing: AdaptiveSizing,
     isDarkTheme: Boolean
 ) {
@@ -348,7 +349,8 @@ fun ChatBubble(
                     audioPath = voicePath,
                     duration = voiceDuration,
                     isUser = isUser,
-                    text = voiceText
+                    text = voiceText,
+                    onResynthesize = onResynthesizeVoice?.let { callback -> { callback(message) } }
                 )
             } else if (message.type == MessageType.IMAGE) {
                 val imageFile = java.io.File(message.linkString.ifBlank { message.content })
