@@ -74,6 +74,28 @@ jobs:
           path: /tmp/llama-api.txt
           if-no-files-found: ignore
 
+      # 只读诊断 2：导出 llama 库的字节码常量，用来确认"线程数"该怎么传（参数表里的键名）。不影响 App。
+      - name: Dump llama bytecode constants (diagnostic)
+        continue-on-error: true
+        run: |
+          cd /tmp/llama
+          : > /tmp/llama-bytecode.txt
+          for f in $(cd cls && find org/nehuatl -name '*.class' | sort); do
+            c=$(echo "$f" | sed 's#\.class$##; s#/#.#g')
+            echo "=== $c" >> /tmp/llama-bytecode.txt
+            javap -p -c -constants -cp cls "$c" >> /tmp/llama-bytecode.txt
+          done
+          echo "---- parameter-name constants ----"
+          grep -n -E "String (n_|use_|model|ctx|thread|embd|lora|rope|cache|flash|batch|gpu|vocab|pooling|mmproj|prompt|seed|temp|top_|min_|penalty|stop|grammar)" /tmp/llama-bytecode.txt | head -120
+
+      - name: Upload llama bytecode listing
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: llama-bytecode
+          path: /tmp/llama-bytecode.txt
+          if-no-files-found: ignore
+
       # R8 混淆映射表：release 包闪退的堆栈靠它还原成真实类名，请保留
       - name: Upload R8 mapping
         if: steps.release.outcome == 'success'
