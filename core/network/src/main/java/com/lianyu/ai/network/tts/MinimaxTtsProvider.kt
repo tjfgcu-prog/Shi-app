@@ -11,7 +11,6 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
-import java.io.File
 import java.util.concurrent.TimeUnit
 
 /**
@@ -53,10 +52,12 @@ class MinimaxTtsProvider : TtsProviderInterface, ConfigurableTtsProvider {
                 put("stream", false)
                 put("voice_setting", JSONObject().apply {
                     put("voice_id", voiceId ?: config.minimaxVoiceId.ifBlank { "female-shaonv" })
-                    put("speed", 1.0)
+                    // 语速跟随设置（MiniMax 支持 0.5~2.0）
+                    put("speed", config.localTtsSpeed.coerceIn(0.5f, 2.0f).toDouble())
                     put("vol", 1.0)
                     put("pitch", 0)
-                    put("emotion", "happy")
+                    // 情绪：空 = 自动（不传，由模型按文本判断）；以前写死 happy，哪怕文本是难过/生气也是开心语气
+                    if (config.minimaxEmotion.isNotBlank()) put("emotion", config.minimaxEmotion)
                 })
                 put("audio_setting", JSONObject().apply {
                     put("sample_rate", 32000)
@@ -89,10 +90,9 @@ class MinimaxTtsProvider : TtsProviderInterface, ConfigurableTtsProvider {
             val hexAudio = json.optJSONObject("data")?.optString("audio")
             if (hexAudio.isNullOrBlank()) return@withContext null
 
-            val outputDir = File(context.cacheDir, "tts_audio")
-            outputDir.mkdirs()
-            val outputFile = File(outputDir, "minimax_${System.currentTimeMillis()}.mp3")
+            val outputFile = VoiceAudioStore.newFile(context, "minimax", "mp3")
             outputFile.writeBytes(hexToBytes(hexAudio))
+            VoiceAudioStore.trim(context)
 
             outputFile.absolutePath
         } catch (e: Exception) {
