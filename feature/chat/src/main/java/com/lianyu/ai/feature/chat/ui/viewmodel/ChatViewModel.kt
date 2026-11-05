@@ -938,6 +938,37 @@ class ChatViewModel(
 
     
 
+    /** 正在重新合成语音的消息 id，防止连点重复合成 */
+    private val resynthesizingIds = java.util.concurrent.ConcurrentHashMap.newKeySet<Long>()
+
+    /**
+     * 语音文件丢失（如被清理）后，用消息里保存的原文重新合成，并让消息指向新文件。
+     * 运行在应用级作用域：中途离开聊天页也会完成。
+     */
+    fun resynthesizeVoice(message: ChatMessage) {
+        val text = com.lianyu.ai.common.VoiceMessageCodec.extractText(message.content) ?: return
+        if (!resynthesizingIds.add(message.id)) return
+        applicationApiScope.launch {
+            try {
+                val result = chatTtsController.synthesizeVoiceReply(text)
+                if (result != null) {
+                    val (path, duration) = result
+                    chatRepository.updateMessageAsVoice(
+                        message.id,
+                        com.lianyu.ai.common.VoiceMessageCodec.encode(duration, text),
+                        path
+                    )
+                } else {
+                    ChatDebugLog.log("[TTS] 重新合成失败 id=${message.id}, 原因=${com.lianyu.ai.network.tts.SherpaLocalTtsProvider.lastError}")
+                }
+            } catch (e: Exception) {
+                SecureLog.w("ChatViewModel", "resynthesizeVoice failed: ${e.message}")
+            } finally {
+                resynthesizingIds.remove(message.id)
+            }
+        }
+    }
+
     /**
      * 发送表情包消息
      * 使用 fileName 存储以便后续查找显示
@@ -1071,6 +1102,8 @@ class ChatViewModel(
 
     override fun onCleared() {
         super.onCleared()
+        // 离开聊天后别让语音继续在后台播
+        com.lianyu.ai.uicommon.component.VoicePlayer.stop()
         // 关闭消息队列，让消费者协程退出等待
         messageQueue.close()
         // 取消 applicationApiScope：停止当前 ViewModel 的消费者协程、内容预热等 UI 相关任务。
