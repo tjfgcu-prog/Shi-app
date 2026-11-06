@@ -36,6 +36,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import kotlinx.coroutines.flow.first
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -86,6 +87,16 @@ fun ChatDetailScreen(
     val settings by store.settingsFlow(companionId).collectAsState(initial = com.lianyu.ai.feature.chat.data.CompanionChatDetailSettings())
     val appSettingsStore = remember { AppSettingsStore(context) }
     val innerThoughtEnabled by appSettingsStore.innerThoughtEnabledFlow(companionId).collectAsState(initial = false)
+
+    // 当前本地语音模型的最大音色编号（用于音色滑块范围）
+    val maxSid by androidx.compose.runtime.produceState(0) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching {
+                val prefs = com.lianyu.ai.network.tts.LocalTtsPreferences(context)
+                com.lianyu.ai.network.tts.LocalTtsCatalog.findById(prefs.selectedModelId.first()).numSpeakers - 1
+            }.getOrDefault(0)
+        }.coerceAtLeast(0)
+    }
 
     var showBgPicker by remember { mutableStateOf(false) }
     var showBlockConfirm by remember { mutableStateOf(false) }
@@ -299,6 +310,21 @@ fun ChatDetailScreen(
                             store.updateSettings(companionId) { it.copy(stickerProbability = (value * 100).toInt()) }
                         }
                     }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // 本角色语音
+            SectionTitle("语音（本角色）")
+            SettingsCard {
+                CompanionVoiceSettings(
+                    sid = settings.voiceSid,
+                    speed = settings.voiceSpeed,
+                    maxSid = maxSid,
+                    onSidChange = { v -> scope.launch { store.updateSettings(companionId) { it.copy(voiceSid = v) } } },
+                    onSpeedChange = { v -> scope.launch { store.updateSettings(companionId) { it.copy(voiceSpeed = v) } } },
+                    onPreview = { s, sp -> viewModel.previewVoice(s, sp) }
                 )
             }
 
@@ -591,3 +617,92 @@ private fun backgroundName(key: String?, context: android.content.Context): Stri
 }
 
 
+
+/** 本角色的语音设置：音色编号 / 语速，可单独设置，也可以沿用全局；带试听。 */
+@Composable
+private fun CompanionVoiceSettings(
+    sid: Int,
+    speed: Float,
+    maxSid: Int,
+    onSidChange: (Int) -> Unit,
+    onSpeedChange: (Float) -> Unit,
+    onPreview: (Int?, Float?) -> Unit
+) {
+    var draftSid by remember(sid) { mutableStateOf(sid.coerceAtLeast(0).toFloat()) }
+    var draftSpeed by remember(speed) { mutableStateOf(if (speed > 0f) speed else 1.0f) }
+
+    SettingsToggleRow(
+        title = "单独设置音色",
+        subtitle = if (sid >= 0) "本角色使用音色 #$sid" else "使用语音设置里的全局音色",
+        checked = sid >= 0,
+        onCheckedChange = { enabled -> onSidChange(if (enabled) draftSid.toInt().coerceIn(0, maxSid) else -1) }
+    )
+    if (sid >= 0 && maxSid > 0) {
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+            Text(
+                text = "音色 #${draftSid.toInt()} / $maxSid",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            androidx.compose.material3.Slider(
+                value = draftSid,
+                onValueChange = { draftSid = it },
+                onValueChangeFinished = { onSidChange(draftSid.toInt().coerceIn(0, maxSid)) },
+                valueRange = 0f..maxSid.toFloat(),
+                modifier = Modifier.fillMaxWidth(),
+                colors = androidx.compose.material3.SliderDefaults.colors(
+                    thumbColor = MaterialTheme.colorScheme.primary,
+                    activeTrackColor = MaterialTheme.colorScheme.primary,
+                    inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            )
+        }
+    }
+
+    SettingsToggleRow(
+        title = "单独设置语速",
+        subtitle = if (speed > 0f) "本角色语速 ${String.format("%.1f", speed)}" else "使用语音设置里的全局语速",
+        checked = speed > 0f,
+        onCheckedChange = { enabled -> onSpeedChange(if (enabled) String.format("%.1f", draftSpeed).toFloat() else 0f) }
+    )
+    if (speed > 0f) {
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+            Text(
+                text = "语速 ${String.format("%.1f", draftSpeed)}",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            androidx.compose.material3.Slider(
+                value = draftSpeed,
+                onValueChange = { draftSpeed = it },
+                onValueChangeFinished = { onSpeedChange(String.format("%.1f", draftSpeed).toFloat()) },
+                valueRange = 0.5f..2.0f,
+                modifier = Modifier.fillMaxWidth(),
+                colors = androidx.compose.material3.SliderDefaults.colors(
+                    thumbColor = MaterialTheme.colorScheme.primary,
+                    activeTrackColor = MaterialTheme.colorScheme.primary,
+                    inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            )
+        }
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "仅「本地」语音能选音色；语速本地和云端都生效",
+            fontSize = 11.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f)
+        )
+        TextButton(onClick = {
+            onPreview(
+                if (sid >= 0) draftSid.toInt().coerceIn(0, maxSid) else null,
+                if (speed > 0f) draftSpeed else null
+            )
+        }) { Text("试听") }
+    }
+}

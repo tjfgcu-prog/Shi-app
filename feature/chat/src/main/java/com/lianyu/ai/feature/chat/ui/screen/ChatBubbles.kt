@@ -76,6 +76,9 @@ import com.lianyu.ai.uicommon.theme.AdaptiveSizing
 
 import android.net.Uri
 import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.RecordVoiceOver
+import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 
@@ -282,10 +285,20 @@ fun ChatBubble(
     onRecall: ((ChatMessage) -> Unit)? = null,
     onRegenerate: ((ChatMessage) -> Unit)? = null,
     onResynthesizeVoice: ((ChatMessage) -> Unit)? = null,
+    onEditMessage: ((ChatMessage, String) -> Unit)? = null,
+    onRereadVoice: ((ChatMessage) -> Unit)? = null,
+    onSetDefaultVoice: ((ChatMessage) -> Unit)? = null,
     adaptiveSizing: AdaptiveSizing,
     isDarkTheme: Boolean
 ) {
     var showMenu by remember { mutableStateOf(false) }
+    var showEditDialog by remember { mutableStateOf(false) }
+    var editText by remember { mutableStateOf("") }
+    val isVoiceMessage = message.content.startsWith("[语音]") || message.type == MessageType.VOICE
+    // 可编辑：语音消息，或普通文字消息（表情包 "[xxx]" 和图片不可编辑）
+    val canEditMessage = isVoiceMessage ||
+        (message.type == MessageType.TEXT && !(message.content.startsWith("[") && message.content.endsWith("]")))
+    val hasLongPressMenu = onRecall != null || onRegenerate != null || onEditMessage != null
 
     val isEmptyContent = message.content.isBlank() && message.type != MessageType.IMAGE &&
             !(message.content.startsWith("[") && message.content.endsWith("]"))
@@ -301,7 +314,7 @@ fun ChatBubble(
             modifier = Modifier
                 .fillMaxWidth()
                 .then(
-                    if (onRecall != null || onRegenerate != null) Modifier.combinedClickable(
+                    if (hasLongPressMenu) Modifier.combinedClickable(
                         interactionSource = bubbleInteractionSource,
                         indication = null,
                         onClick = {},
@@ -350,7 +363,8 @@ fun ChatBubble(
                     duration = voiceDuration,
                     isUser = isUser,
                     text = voiceText,
-                    onResynthesize = onResynthesizeVoice?.let { callback -> { callback(message) } }
+                    onResynthesize = onResynthesizeVoice?.let { callback -> { callback(message) } },
+                    onLongClick = if (hasLongPressMenu) ({ showMenu = true }) else null
                 )
             } else if (message.type == MessageType.IMAGE) {
                 val imageFile = java.io.File(message.linkString.ifBlank { message.content })
@@ -449,6 +463,71 @@ fun ChatBubble(
             modifier = Modifier.background(MaterialTheme.colorScheme.surface),
             offset = DpOffset(x = 0.dp, y = 0.dp)
         ) {
+            if (!isUser && onEditMessage != null && canEditMessage) {
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = "编辑",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    },
+                    onClick = {
+                        showMenu = false
+                        editText = if (isVoiceMessage) {
+                            com.lianyu.ai.common.VoiceMessageCodec.extractText(message.content).orEmpty()
+                        } else {
+                            message.content
+                        }
+                        showEditDialog = true
+                    },
+                    leadingIcon = {
+                        Icon(Icons.Outlined.Edit, "编辑",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp))
+                    }
+                )
+            }
+            if (!isUser && isVoiceMessage && onRereadVoice != null) {
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = "换个声音重读",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    },
+                    onClick = {
+                        showMenu = false
+                        onRereadVoice(message)
+                    },
+                    leadingIcon = {
+                        Icon(Icons.Outlined.RecordVoiceOver, "换个声音重读",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp))
+                    }
+                )
+            }
+            if (!isUser && isVoiceMessage && onSetDefaultVoice != null) {
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = "设为该角色默认音色",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    },
+                    onClick = {
+                        showMenu = false
+                        onSetDefaultVoice(message)
+                    },
+                    leadingIcon = {
+                        Icon(Icons.Outlined.StarOutline, "设为默认音色",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp))
+                    }
+                )
+            }
             if (!isUser && onRegenerate != null) {
                 DropdownMenuItem(
                     text = {
@@ -489,6 +568,30 @@ fun ChatBubble(
                     }
                 )
             }
+        }
+        if (showEditDialog) {
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { showEditDialog = false },
+                title = { Text("编辑这条消息") },
+                text = {
+                    androidx.compose.material3.OutlinedTextField(
+                        value = editText,
+                        onValueChange = { editText = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 2,
+                        maxLines = 8
+                    )
+                },
+                confirmButton = {
+                    androidx.compose.material3.TextButton(onClick = {
+                        showEditDialog = false
+                        onEditMessage?.invoke(message, editText)
+                    }) { Text("确定") }
+                },
+                dismissButton = {
+                    androidx.compose.material3.TextButton(onClick = { showEditDialog = false }) { Text("取消") }
+                }
+            )
         }
     }
 }

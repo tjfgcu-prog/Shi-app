@@ -490,6 +490,9 @@ fun ChatScreen(
                         onRecall = { msg -> viewModel.recallMessage(msg) },
                         onRegenerate = { msg -> viewModel.regenerateMessage(msg) },
                         onResynthesizeVoice = { msg -> viewModel.resynthesizeVoice(msg) },
+                        onEditMessage = { msg, text -> viewModel.editAiMessage(msg, text) },
+                        onRereadVoice = { msg -> viewModel.rereadWithAnotherVoice(msg) },
+                        onSetDefaultVoice = { msg -> viewModel.setDefaultVoiceFromMessage(msg) },
                         adaptiveSizing = adaptiveSizing,
                         isDarkTheme = isDarkTheme
                     )
