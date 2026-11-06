@@ -20,17 +20,28 @@ import java.io.File
 class ChatTtsController(
     private val context: Context,
     private val ttsService: TtsService,
-    private val configProvider: () -> ChatTtsConfig
+    private val configProvider: () -> ChatTtsConfig,
+    /** 当前角色单独设置的 (音色编号, 语速)；null 表示沿用全局设置 */
+    private val voiceOverrideProvider: suspend () -> Pair<Int?, Float?> = { null to null }
 ) {
     /** 是否开启语音回复模式 */
     fun isVoiceReplyEnabled(): Boolean = configProvider().mode == ChatTtsMode.VOICE_BAR
 
     /**
      * 合成一段语音回复。
+     * @param sidOverride 指定本地音色编号（如"换个声音重读"）；null = 用角色设置/全局设置
+     * @param speedOverride 指定语速；null = 用角色设置/全局设置
      * @return (音频文件路径, 实际时长秒) 或 null（合成失败/文本为空）
      */
-    suspend fun synthesizeVoiceReply(text: String): Pair<String, Int>? {
+    suspend fun synthesizeVoiceReply(
+        text: String,
+        sidOverride: Int? = null,
+        speedOverride: Float? = null
+    ): Pair<String, Int>? {
         val cfg = configProvider()
+        val (companionSid, companionSpeed) = runCatching { voiceOverrideProvider() }.getOrDefault(null to null)
+        val sid = sidOverride ?: companionSid
+        val speed = speedOverride ?: companionSpeed
         val cleaned = TtsTextCleaner.clean(text, cfg.skipParentheses)
         if (cleaned.isBlank()) return null
 
@@ -38,7 +49,7 @@ class ChatTtsController(
             // 多段回复会同时排队合成：先串行（超时只从轮到自己时开始算），
             // 并且本地 VITS 在 LLM 同时推理（如剧情摘要）时会很慢，10 秒太短 → 放宽到 60 秒。
             synthMutex.withLock {
-                withTimeoutOrNull(LOCAL_SYNTH_TIMEOUT_MS) { ttsService.synthesize(cleaned) }
+                withTimeoutOrNull(LOCAL_SYNTH_TIMEOUT_MS) { ttsService.synthesize(cleaned, null, speed, sid) }
             }
         } catch (e: Exception) {
             SecureLog.e("ChatTtsController", "synthesizeVoiceReply failed", e)
