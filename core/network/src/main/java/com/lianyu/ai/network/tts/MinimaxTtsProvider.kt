@@ -35,7 +35,15 @@ class MinimaxTtsProvider : TtsProviderInterface, ConfigurableTtsProvider {
         this.config = config
     }
 
-    override suspend fun synthesize(context: Context, text: String, voiceId: String?): String? = withContext(Dispatchers.IO) {
+    override suspend fun synthesize(context: Context, text: String, voiceId: String?): String? =
+        synthesize(context, text, voiceId, null)
+
+    override suspend fun synthesize(
+        context: Context,
+        text: String,
+        voiceId: String?,
+        speedOverride: Float?
+    ): String? = withContext(Dispatchers.IO) {
         try {
             val apiKey = config.minimaxApiKey
             val groupId = config.minimaxGroupId
@@ -53,7 +61,7 @@ class MinimaxTtsProvider : TtsProviderInterface, ConfigurableTtsProvider {
                 put("voice_setting", JSONObject().apply {
                     put("voice_id", voiceId ?: config.minimaxVoiceId.ifBlank { "female-shaonv" })
                     // 语速跟随设置（MiniMax 支持 0.5~2.0）
-                    put("speed", config.localTtsSpeed.coerceIn(0.5f, 2.0f).toDouble())
+                    put("speed", (speedOverride ?: config.localTtsSpeed).coerceIn(0.5f, 2.0f).toDouble())
                     put("vol", 1.0)
                     put("pitch", 0)
                     // 情绪：空 = 自动（不传，由模型按文本判断）；以前写死 happy，哪怕文本是难过/生气也是开心语气

@@ -45,6 +45,14 @@ class SherpaLocalTtsProvider : TtsProviderInterface, ConfigurableTtsProvider {
     }
 
     override suspend fun synthesize(context: Context, text: String, voiceId: String?): String? =
+        synthesize(context, text, voiceId, null)
+
+    override suspend fun synthesize(
+        context: Context,
+        text: String,
+        voiceId: String?,
+        speedOverride: Float?
+    ): String? =
         withContext(Dispatchers.IO) {
             try {
                 val preferences = LocalTtsPreferences(context)
@@ -63,7 +71,8 @@ class SherpaLocalTtsProvider : TtsProviderInterface, ConfigurableTtsProvider {
                 }
                 val tts = getOrLoadOfflineTts(context, model)
                 val sid = parseSid(voiceId, model)
-                val speed = config.localTtsSpeed.coerceIn(0.5f, 2.0f)
+                // 语速：角色单独设置 > 全局设置
+                val speed = (speedOverride ?: config.localTtsSpeed).coerceIn(0.5f, 2.0f)
 
                 SecureLog.d(TAG, "合成: model=${model.id}, sid=$sid, speed=$speed, len=${text.length}")
                 val startedAt = System.currentTimeMillis()
@@ -72,7 +81,8 @@ class SherpaLocalTtsProvider : TtsProviderInterface, ConfigurableTtsProvider {
 
                 // 去掉首尾静音 + 统一响度，再落盘
                 val processed = AudioPostProcess.process(audio.samples, audio.sampleRate)
-                val outputFile = VoiceAudioStore.newFile(context, "local", "wav")
+                // 文件名带音色编号（local_s<sid>_…），"设为该角色默认音色"时从文件名读回
+                val outputFile = VoiceAudioStore.newFile(context, "local_s$sid", "wav")
                 LocalTtsWavWriter.writePcmToWav(processed, audio.sampleRate, outputFile)
                 // 真实波形：与音频同名的 .wf 伴随文件
                 VoiceWaveform.write(outputFile.absolutePath, VoiceWaveform.fromSamples(processed))

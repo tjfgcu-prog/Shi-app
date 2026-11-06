@@ -37,6 +37,8 @@ class TtsService(private val context: Context) {
         LocalTtsModelManager.getInstance(context)
     }
 
+    fun getCurrentProvider(): TtsProvider = currentProvider
+
     fun setProvider(provider: TtsProvider) {
         currentProvider = provider
         SecureLog.i("TtsService", "Switched TTS provider to ${provider.displayName}")
@@ -58,7 +60,16 @@ class TtsService(private val context: Context) {
 
     
 
-    suspend fun synthesize(text: String, voiceId: String? = null): String? = withContext(Dispatchers.IO) {
+    /**
+     * @param speed 语速覆盖（角色单独设置），null = 用全局设置
+     * @param localSid 本地 VITS 的音色编号覆盖（角色单独设置）；只在当前引擎是"本地"时生效
+     */
+    suspend fun synthesize(
+        text: String,
+        voiceId: String? = null,
+        speed: Float? = null,
+        localSid: Int? = null
+    ): String? = withContext(Dispatchers.IO) {
         try {
             if (currentProvider == TtsProvider.ANDROID && !androidTts.isInitialized()) {
                 androidTts.initialize(context)
@@ -67,7 +78,8 @@ class TtsService(private val context: Context) {
                 ?: throw IllegalStateException("Provider ${currentProvider.name} not initialized")
 
             SecureLog.d("TtsService", "Synthesizing text with ${currentProvider.displayName}, length=${text.length}")
-            val result = provider.synthesize(context, text, voiceId)
+            val effectiveVoiceId = if (currentProvider == TtsProvider.LOCAL && localSid != null) "speaker_$localSid" else voiceId
+            val result = provider.synthesize(context, text, effectiveVoiceId, speed)
 
             if (result != null) {
                 SecureLog.i("TtsService", "TTS synthesis successful: $result")

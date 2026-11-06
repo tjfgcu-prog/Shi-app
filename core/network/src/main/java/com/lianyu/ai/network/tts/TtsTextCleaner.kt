@@ -11,7 +11,9 @@ package com.lianyu.ai.network.tts
  * 1. 移除 `<voice:> <note:> <web_search:> <start_voice_call>` 等内部指令标签
  * 2. （可选）移除括号内容 `<...> (...) （...）` ——跳过 AI 的"内心戏"
  * 3. 移除方括号贴纸 `[微笑]`
- * 4. 移除 Markdown 标记 `*_~`
+ * 4. 移除 Markdown 标记 `*_`
+ *
+ * 读法处理（颜文字/emoji 不读、"～""…"加停顿、数字与英文的读法）见 [TtsTextNormalizer]。
  */
 object TtsTextCleaner {
 
@@ -31,8 +33,8 @@ object TtsTextCleaner {
     /** 移除 `[微笑]` 这类方括号贴纸标签 */
     private val TTS_BRACKET_REMOVE = Regex("\\[[^\\]]+\\]")
 
-    /** 移除 Markdown 加粗/斜体/删除线标记 `* _ ~` */
-    private val TTS_MARKDOWN_REMOVE = Regex("[*_~]")
+    /** 移除 Markdown 加粗/斜体标记 `* _`（`~` 由 [TtsTextNormalizer] 当作停顿处理） */
+    private val TTS_MARKDOWN_REMOVE = Regex("[*_]")
 
     /**
      * 清洗文本以供 TTS 朗读。
@@ -45,13 +47,17 @@ object TtsTextCleaner {
         var s = text
         // 1. 指令标签（与参考 cleanMessageForDisplay 思路一致，但精简为 TTS 专用）
         s = TAG_REMOVE.replace(s, "")
-        // 2. 括号内心戏（可选）
+        // 2. emoji / 颜文字不读（要在"跳过括号"之前，否则"(≧▽≦)"这类会被当成普通括号内容）
+        s = TtsTextNormalizer.stripKaomoji(s)
+        // 3. 括号内心戏（可选）
         if (skipParentheses) {
             s = PARENTHESES_REMOVE.replace(s, "")
         }
-        // 3. 方括号贴纸
+        // 4. 方括号贴纸
         s = TTS_BRACKET_REMOVE.replace(s, "")
-        // 4. Markdown 标记
+        // 5. 读法：停顿、数字、英文、标点整理
+        s = TtsTextNormalizer.normalize(s)
+        // 6. Markdown 标记
         s = TTS_MARKDOWN_REMOVE.replace(s, "")
         return s.trim()
     }
