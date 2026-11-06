@@ -10,6 +10,7 @@ object PerfPrefs {
     private const val PREFS = "perf_prefs"
     private const val KEY_TTS_THREADS = "tts_threads"
     private const val KEY_EMBEDDING_THREADS = "embedding_threads"
+    private const val KEY_LLM_THREADS = "llm_threads"
 
     /** 语音合成默认线程数：2 个，给同时运行的大模型留出 CPU */
     const val DEFAULT_TTS_THREADS = 2
@@ -24,6 +25,17 @@ object PerfPrefs {
     fun setTtsThreads(context: Context, value: Int) {
         context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit().putInt(KEY_TTS_THREADS, value.coerceIn(1, cpuCores())).apply()
+    }
+
+    /** 本地大模型线程数：0 = 自动（用 llama 库自己的默认值）；其他值 = 手动指定 */
+    fun llmThreads(context: Context): Int =
+        context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getInt(KEY_LLM_THREADS, 0)
+            .coerceIn(0, cpuCores())
+
+    fun setLlmThreads(context: Context, value: Int) {
+        context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putInt(KEY_LLM_THREADS, value.coerceIn(0, cpuCores())).apply()
     }
 
     /** 记忆向量线程数：0 = 自动（交给 ONNX Runtime 决定） */
