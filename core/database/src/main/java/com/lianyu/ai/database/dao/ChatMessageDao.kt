@@ -42,4 +42,7 @@ interface ChatMessageDao {
     @Query("UPDATE chat_messages SET content = :content, searchContent = :content, type = :type, linkString = :linkString WHERE id = :messageId")
     suspend fun updateMessageAsVoice(messageId: Long, content: String, type: com.lianyu.ai.database.model.MessageType, linkString: String): Int
 
+    @Query("UPDATE chat_messages SET content = :content, searchContent = :searchContent WHERE id = :messageId")
+    suspend fun updateMessageContent(messageId: Long, content: String, searchContent: String): Int
+
 }
