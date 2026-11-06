@@ -28,6 +28,8 @@ data class CompanionChatDetailSettings(
     val stickerProbability: Int = 30, // AI发送表情包的概率 0-100
     val ntpTimeEnabled: Boolean = false, // 是否启用NTP精确时间感知（关闭则使用设备本地时间）
     val storyModeEnabled: Boolean = false, // 剧情模式：开=记录每轮并每5轮生成摘要；关=日常模式
+    val voiceSid: Int = -1, // 本角色的本地语音音色编号；-1 = 使用全局设置
+    val voiceSpeed: Float = 0f, // 本角色的语速；0 = 使用全局设置
     val updatedAt: Long = System.currentTimeMillis()
 )
 
