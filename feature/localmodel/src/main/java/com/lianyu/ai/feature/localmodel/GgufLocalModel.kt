@@ -1,6 +1,7 @@
 package com.lianyu.ai.feature.localmodel
 
 import android.content.Context
+import com.lianyu.ai.common.PerfPrefs
 import com.lianyu.ai.domain.LocalModelStatus
 import java.io.File
 import kotlinx.coroutines.CancellationException
@@ -48,12 +49,20 @@ class GgufLocalModel(context: Context) {
 
     // 卸载后丢弃旧实例、下次加载时新建一个：
     // 库文档只说明 release() 用于清理，没有说明释放后能否继续复用同一个实例。
-    @Volatile private var helper: LlamaHelper? = null
-    private fun obtainHelper(): LlamaHelper =
-        helper ?: LlamaHelper(appContext.contentResolver, scope, llmFlow).also { helper = it }
+    // 线程数选"自动"(0) 时用库自带的 LlamaHelper；手动指定线程数时用我们自己的实现（见 LlamaBackend.kt）。
+    @Volatile private var backend: LlamaBackend? = null
+    private fun obtainBackend(threads: Int): LlamaBackend =
+        backend ?: (
+            if (threads > 0) {
+                ThreadedLlamaBackend(appContext.contentResolver, scope, llmFlow, threads)
+            } else {
+                StockLlamaBackend(LlamaHelper(appContext.contentResolver, scope, llmFlow))
+            }
+            ).also { backend = it }
 
     @Volatile private var loadedUri: String? = null
     @Volatile private var loadedContextLength: Int = -1
+    @Volatile private var loadedThreads: Int = -1
     @Volatile private var loadMs: Long = 0L
 
     /** 当前真实状态，供设置页显示。 */
@@ -67,10 +76,11 @@ class GgufLocalModel(context: Context) {
 
     /** 释放原生内存并回到"未加载"。 */
     private fun releaseNative() {
-        val h = helper
-        helper = null
+        val h = backend
+        backend = null
         loadedUri = null
         loadedContextLength = -1
+        loadedThreads = -1
         loadMs = 0L
         if (h != null) {
             runCatching { h.abort() }
@@ -92,18 +102,19 @@ class GgufLocalModel(context: Context) {
      * @return true 表示这次真的执行了加载；false 表示已经是加载好的状态。
      */
     private suspend fun ensureLoaded(modelUri: String, contextLength: Int): Boolean {
-        if (loadedUri == modelUri && loadedContextLength == contextLength) {
+        val wantedThreads = PerfPrefs.llmThreads(appContext)
+        if (loadedUri == modelUri && loadedContextLength == contextLength && loadedThreads == wantedThreads) {
             logD("ensureLoaded: already loaded with same contextLength, skip. uri=$modelUri")
             return false
         }
         if (loadedUri != null) {
-            // 换了模型或上下文长度：先释放旧的，避免两份模型同时占内存
+            // 换了模型、上下文长度或线程数：先释放旧的，避免两份模型同时占内存
             logD("ensureLoaded: params changed, releasing old context first")
             releaseNative()
         }
         val startedAt = System.currentTimeMillis()
         status = LocalModelStatus.Loading(startedAt)
-        logD("ensureLoaded: begin load, uri=$modelUri, contextLength=$contextLength")
+        logD("ensureLoaded: begin load, uri=$modelUri, contextLength=$contextLength, threads=$wantedThreads(0=自动)")
 
         // load() 的回调只在成功时触发，失败没有回调：
         // 一方面监听引擎的 Error 事件，另一方面设置超时，保证不会无限等待。
@@ -120,7 +131,7 @@ class GgufLocalModel(context: Context) {
                         }
                     }
                     cont.invokeOnCancellation { errorJob.cancel() }
-                    obtainHelper().load(path = modelUri, contextLength = contextLength) { id ->
+                    obtainBackend(wantedThreads).load(modelUri, contextLength) { id ->
                         logD("ensureLoaded: load callback fired, id=$id")
                         errorJob.cancel()
                         if (cont.isActive) cont.resume(true)
@@ -136,6 +147,7 @@ class GgufLocalModel(context: Context) {
             true -> {
                 loadedUri = modelUri
                 loadedContextLength = contextLength
+                loadedThreads = wantedThreads
                 loadMs = System.currentTimeMillis() - startedAt
                 status = LocalModelStatus.Loaded(contextLength, loadMs)
                 logD("ensureLoaded: loaded in ${loadMs}ms")
@@ -221,7 +233,7 @@ class GgufLocalModel(context: Context) {
                     }
                     cont.invokeOnCancellation { collectJob.cancel() }
                     logD("generate: calling llamaHelper.predict()")
-                    scope.launch { obtainHelper().predict(chatMlPrompt) }
+                    scope.launch { obtainBackend(loadedThreads.coerceAtLeast(0)).predict(chatMlPrompt) }
                 }
             } finally {
                 if (loadedUri != null) {
