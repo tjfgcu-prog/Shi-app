@@ -116,7 +116,12 @@ class ChatViewModel(
     private val chatTtsController = ChatTtsController(
         context = application.applicationContext,
         ttsService = ttsService,
-        configProvider = { chatTtsConfig }
+        configProvider = { chatTtsConfig },
+        // 每个角色可以有自己的音色和语速（存在聊天详情设置里），没设置就沿用全局
+        voiceOverrideProvider = {
+            val s = chatDetailSettingsStore.getSettings(companionId)
+            s.voiceSid.takeIf { it >= 0 } to s.voiceSpeed.takeIf { it > 0f }
+        }
     )
     private val chatDetailSettingsStore = com.lianyu.ai.feature.chat.data.ChatDetailSettingsStore(application)
     private val appSettingsStore = AppSettingsStore(application)
@@ -937,6 +942,122 @@ class ChatViewModel(
     }
 
     
+
+    private fun showToast(message: String) {
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            android.widget.Toast.makeText(getApplication<Application>(), message, android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    /** 当前选中的本地语音模型有多少个音色 */
+    private suspend fun localSpeakerCount(): Int {
+        val prefs = com.lianyu.ai.network.tts.LocalTtsPreferences(getApplication<Application>())
+        return com.lianyu.ai.network.tts.LocalTtsCatalog.findById(prefs.selectedModelId.first()).numSpeakers
+    }
+
+    /** 从语音文件名（local_s<sid>_…）读回合成时用的音色编号；旧语音没有则返回 null */
+    private fun sidFromAudioPath(path: String): Int? =
+        Regex("_s(\\d+)_").find(java.io.File(path).name)?.groupValues?.get(1)?.toIntOrNull()
+
+    /** 聊天设置页"试听"：用指定音色/语速读一句固定的话并播放（null = 用当前生效的设置） */
+    fun previewVoice(sid: Int?, speed: Float?) {
+        applicationApiScope.launch {
+            val result = chatTtsController.synthesizeVoiceReply("你好呀，这是我的声音，你觉得好听吗？", sid, speed)
+            if (result != null) {
+                kotlinx.coroutines.withContext(Dispatchers.Main) {
+                    com.lianyu.ai.uicommon.component.VoicePlayer.toggle(result.first)
+                }
+            } else {
+                showToast("试听失败：${com.lianyu.ai.network.tts.SherpaLocalTtsProvider.lastError ?: "语音引擎未就绪"}")
+            }
+        }
+    }
+
+    /** 长按语音"换个声音重读"：随机换一个本地音色，用原文重新合成并替换这条语音 */
+    fun rereadWithAnotherVoice(message: ChatMessage) {
+        val text = com.lianyu.ai.common.VoiceMessageCodec.extractText(message.content) ?: return
+        if (ttsService.getCurrentProvider() != com.lianyu.ai.network.tts.TtsProvider.LOCAL) {
+            showToast("只有「本地」语音才能换音色")
+            return
+        }
+        if (!resynthesizingIds.add(message.id)) return
+        applicationApiScope.launch {
+            try {
+                val count = localSpeakerCount()
+                if (count <= 1) {
+                    showToast("当前本地语音模型只有一个音色")
+                    return@launch
+                }
+                val current = sidFromAudioPath(message.linkString)
+                var sid: Int
+                do {
+                    sid = kotlin.random.Random.nextInt(count)
+                } while (sid == current)
+                val result = chatTtsController.synthesizeVoiceReply(text, sid, null)
+                if (result != null) {
+                    chatRepository.updateMessageAsVoice(
+                        message.id,
+                        com.lianyu.ai.common.VoiceMessageCodec.encode(result.second, text),
+                        result.first
+                    )
+                    showToast("已换成音色 #$sid，喜欢的话长按选「设为该角色默认音色」")
+                } else {
+                    showToast("换声音失败：${com.lianyu.ai.network.tts.SherpaLocalTtsProvider.lastError ?: "合成失败"}")
+                }
+            } catch (e: Exception) {
+                SecureLog.w("ChatViewModel", "rereadWithAnotherVoice failed: ${e.message}")
+            } finally {
+                resynthesizingIds.remove(message.id)
+            }
+        }
+    }
+
+    /** 把这条语音用的音色设为本角色的默认音色 */
+    fun setDefaultVoiceFromMessage(message: ChatMessage) {
+        val sid = sidFromAudioPath(message.linkString)
+        if (sid == null) {
+            showToast("这条语音没有记录音色（旧语音），先点「换个声音重读」再设置")
+            return
+        }
+        applicationApiScope.launch {
+            chatDetailSettingsStore.updateSettings(companionId) { it.copy(voiceSid = sid) }
+            showToast("已把音色 #$sid 设为本角色的默认音色")
+        }
+    }
+
+    /**
+     * 用户编辑 AI 发出的消息：原地替换文字，这条消息仍然算 AI 发的。
+     * 语音消息会用新文字重新合成语音。
+     */
+    fun editAiMessage(message: ChatMessage, newText: String) {
+        val text = newText.trim()
+        if (text.isEmpty() || message.isFromUser) return
+        val isVoice = message.type == com.lianyu.ai.database.model.MessageType.VOICE
+        applicationApiScope.launch {
+            try {
+                if (isVoice) {
+                    val result = chatTtsController.synthesizeVoiceReply(text)
+                    if (result == null) {
+                        showToast("语音合成失败，消息没有修改")
+                        return@launch
+                    }
+                    chatRepository.updateMessageAsVoice(
+                        message.id,
+                        com.lianyu.ai.common.VoiceMessageCodec.encode(result.second, text),
+                        result.first
+                    )
+                } else {
+                    chatRepository.updateMessageContent(message.id, text)
+                }
+                // 上下文缓存是按"最后一条消息的 id"判断过期的，编辑不会改 id，
+                // 必须手动清掉缓存，AI 下一轮才会读到修改后的文字
+                contextResolver.clearCache(companionId)
+            } catch (e: Exception) {
+                SecureLog.w("ChatViewModel", "editAiMessage failed: ${e.message}")
+                showToast("修改失败")
+            }
+        }
+    }
 
     /** 正在重新合成语音的消息 id，防止连点重复合成 */
     private val resynthesizingIds = java.util.concurrent.ConcurrentHashMap.newKeySet<Long>()
