@@ -81,6 +81,14 @@ class ChatRepository(private val chatMessageDao: ChatMessageDao) {
      * 把一条已发送的文字消息原地升级为语音消息（TTS 异步合成完成后调用）。
      * content 同样需要加密存储（与 ChatMessageCrypto.encrypt 保持一致）。
      */
+    /**
+     * 原地修改一条消息的文字（用户编辑 AI 消息时用）。
+     * content 加密存储；searchContent 保持明文以支持 LIKE 查询（与 encryptForStorage 一致）。
+     */
+    suspend fun updateMessageContent(messageId: Long, content: String) {
+        chatMessageDao.updateMessageContent(messageId, ChatMessageCrypto.encrypt(content), content)
+    }
+
     suspend fun updateMessageAsVoice(messageId: Long, displayContent: String, linkString: String) {
         chatMessageDao.updateMessageAsVoice(
             messageId,
