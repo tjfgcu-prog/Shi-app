@@ -1,8 +1,9 @@
 package com.lianyu.ai.uicommon.component
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -52,6 +53,7 @@ import java.io.File
  * - 不再有常驻动画：只有正在播放的那一个气泡每 80ms 刷新一次进度。
  * - 音频文件丢失（被清理）时显示"点击重新合成"，点击触发 [onResynthesize]。
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun VoiceMessageBubble(
     audioPath: String,
@@ -60,6 +62,7 @@ fun VoiceMessageBubble(
     text: String? = null,
     onPlayComplete: (() -> Unit)? = null,
     onResynthesize: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val bubbleColor = if (isUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
@@ -106,10 +109,12 @@ fun VoiceMessageBubble(
     Column(
         modifier = modifier
             .widthIn(max = 230.dp)
-            .clickable(
+            .combinedClickable(
                 interactionSource = remember { MutableInteractionSource() },
-                indication = null
-            ) { handleTap() }
+                indication = null,
+                onClick = { handleTap() },
+                onLongClick = onLongClick
+            )
             .background(bubbleColor, RoundedCornerShape(16.dp))
             .padding(horizontal = 10.dp, vertical = 8.dp)
     ) {
