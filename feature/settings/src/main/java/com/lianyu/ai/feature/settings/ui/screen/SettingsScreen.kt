@@ -972,6 +972,7 @@ private fun GgufLocalModelSection(
         // 卡片2.5：线程数（语音合成 / 记忆向量）
         var ttsThreads by remember { mutableStateOf(com.lianyu.ai.common.PerfPrefs.ttsThreads(context)) }
         var embeddingThreads by remember { mutableStateOf(com.lianyu.ai.common.PerfPrefs.embeddingThreads(context)) }
+        var llmThreads by remember { mutableStateOf(com.lianyu.ai.common.PerfPrefs.llmThreads(context)) }
         val cpuCores = remember { com.lianyu.ai.common.PerfPrefs.cpuCores() }
         Column(
             modifier = Modifier
@@ -1015,8 +1016,19 @@ private fun GgufLocalModelSection(
                     com.lianyu.ai.common.PerfPrefs.setEmbeddingThreads(context, it)
                 }
             )
+            Text(text = "大模型线程（默认自动，改完下次生成回复时会重新加载模型）", fontSize = 12.sp, color = textSecondaryColor)
+            ThreadChipRow(
+                options = listOf(0) + (1..cpuCores).toList().take(7),
+                selected = llmThreads,
+                labelOf = { if (it == 0) "自动" else it.toString() },
+                textSecondaryColor = textSecondaryColor,
+                onSelect = {
+                    llmThreads = it
+                    com.lianyu.ai.common.PerfPrefs.setLlmThreads(context, it)
+                }
+            )
             Text(
-                text = "大模型（Qwen）的线程数暂时不能设置：所用的 llama 库是否开放这个参数还在确认，确认后再加。",
+                text = "自动 = 交给 llama 库决定（按它的来源，8 核手机上通常是 4 个）。线程不是越多越快：超过大核数量后反而会变慢、更烫，建议从 4 开始试。改线程数会让下一次回复多等一次模型加载（约 15 到 20 秒）。",
                 fontSize = 11.sp,
                 color = textSecondaryColor
             )
