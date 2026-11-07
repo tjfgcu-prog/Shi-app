@@ -102,7 +102,8 @@ internal class ThreadedLlamaBackend(
                 events.tryEmit(LlamaHelper.LLMEvent.Error("Model initialization failed"))
                 return@launch
             }
-            val contextId = (result["contextId"] as? Number)?.toInt()
+            // startEngine 的返回值可能为 null（平台类型），按空处理
+            val contextId = (result?.get("contextId") as? Number)?.toInt()
             if (contextId == null) {
                 Log.e(TAG, "contextId not found in result map")
                 events.tryEmit(LlamaHelper.LLMEvent.Error("Model initialization failed"))
