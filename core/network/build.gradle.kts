@@ -44,5 +44,8 @@ dependencies {
     // compileOnly: library 模块不能打包 AAR，运行时由 app 模块提供
     compileOnly(files("libs/sherpa-onnx-1.13.3.aar"))
 
+    // JNA：直连 libcrispasr.so（Breeze TTS 本地合成）。必须用 @aar，里面自带 libjnidispatch.so
+    implementation("net.java.dev.jna:jna:5.14.0@aar")
+
     testImplementation(libs.junit)
 }
