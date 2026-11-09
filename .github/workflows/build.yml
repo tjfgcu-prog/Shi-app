@@ -25,6 +25,37 @@ jobs:
       - name: Check signing keystore
         run: test -f release.keystore || (echo "仓库根目录缺少 release.keystore，请先上传" && exit 1)
 
+      # ── CrispASR 原生库（Breeze 本地 TTS 用）──
+      # 只在缓存不存在时编译（约十几分钟）；想升级 CrispASR 或重编，把下面 key 末尾的 v1 改成 v2
+      - name: Cache CrispASR native libs
+        id: crispasr-cache
+        uses: actions/cache@v4
+        with:
+          path: crispasr-so
+          key: crispasr-so-arm64-v1
+
+      - name: Build CrispASR native libs (arm64-v8a)
+        if: steps.crispasr-cache.outputs.cache-hit != 'true'
+        run: |
+          set -e
+          export ANDROID_NDK="${ANDROID_NDK_LATEST_HOME:-$ANDROID_NDK_HOME}"
+          export ANDROID_NDK_HOME="$ANDROID_NDK"
+          echo "NDK = $ANDROID_NDK"
+          git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/CrispStrobe/CrispASR.git "$RUNNER_TEMP/crispasr"
+          cd "$RUNNER_TEMP/crispasr"
+          chmod +x build-android.sh
+          ./build-android.sh
+          mkdir -p "$GITHUB_WORKSPACE/crispasr-so"
+          find . -name '*.so' -not -path '*/CMakeFiles/*' -not -path './tests/*' -not -path './examples/*' -exec cp -v {} "$GITHUB_WORKSPACE/crispasr-so/" \;
+          "$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip" --strip-unneeded "$GITHUB_WORKSPACE"/crispasr-so/*.so || true
+          ls -la "$GITHUB_WORKSPACE/crispasr-so"
+          test -f "$GITHUB_WORKSPACE/crispasr-so/libcrispasr.so"
+
+      - name: Install CrispASR native libs into app
+        run: |
+          mkdir -p app/src/main/jniLibs/arm64-v8a
+          cp -v crispasr-so/*.so app/src/main/jniLibs/arm64-v8a/
+
       - name: Build Debug APK
         run: ./gradlew assembleDebug
 
