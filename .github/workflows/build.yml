@@ -58,8 +58,28 @@ jobs:
 
       - name: Install CrispASR native libs into app
         run: |
-          mkdir -p app/src/main/jniLibs/arm64-v8a
-          cp -v crispasr-so/*.so app/src/main/jniLibs/arm64-v8a/
+          set -e
+          export ANDROID_NDK="${ANDROID_NDK_LATEST_HOME:-$ANDROID_NDK_HOME}"
+          LLVM="$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64"
+          DEST=app/src/main/jniLibs/arm64-v8a
+          mkdir -p "$DEST"
+          cp -v crispasr-so/*.so "$DEST/"
+          # 打印这些库还依赖哪些库（方便排查"找不到 libxxx.so"）
+          for f in crispasr-so/*.so; do echo "== $f"; "$LLVM/bin/llvm-readelf" -d "$f" | grep NEEDED || true; done
+          NEEDED=$("$LLVM/bin/llvm-readelf" -d crispasr-so/*.so | grep NEEDED | sed 's/.*\[\(.*\)\]/\1/' | sort -u)
+          # CrispASR 用了 OpenMP，运行时库 libomp.so 在 NDK 里，必须一起打进 APK，否则加载时报 libomp.so not found
+          if echo "$NEEDED" | grep -qx "libomp.so"; then
+            OMP=$(find "$LLVM/lib" -path '*linux/aarch64/libomp.so' | head -1)
+            test -n "$OMP" || { echo "::error::NDK 里找不到 aarch64 的 libomp.so"; exit 1; }
+            cp -v "$OMP" "$DEST/"
+          fi
+          # 如果依赖共享的 C++ 运行库，也一起带上
+          if echo "$NEEDED" | grep -qx "libc++_shared.so"; then
+            CXX="$LLVM/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so"
+            test -f "$CXX" || { echo "::error::NDK 里找不到 libc++_shared.so"; exit 1; }
+            cp -v "$CXX" "$DEST/"
+          fi
+          ls -la "$DEST"
 
       - name: Build Debug APK
         run: ./gradlew assembleDebug
