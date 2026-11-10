@@ -27,7 +27,7 @@ import java.io.File
  *
  * 文件：用户手动选 GGUF，复制进 `<filesDir>/models/tts/breeze/`：
  *   - breeze-model.gguf  Breeze TTS 2 主模型（如 breeze-tts-2-q8_0.gguf）
- *   - breeze-codec.gguf  音频 codec（qwen3-tts-tokenizer-12hz.gguf）
+ *   - qwen3-tts-tokenizer-12hz.gguf  音频 codec（用官方文件名，CrispASR 会在模型旁边按这个名字自动找；必须用 F16 版）
  *   - voice.wav          （可选）自定义音色的参考录音；配套文字稿存在 SharedPreferences
  *     有参考录音时，每次加载模型都会自动设置为当前音色，之后所有合成都用这个音色。
  *
@@ -54,7 +54,7 @@ object CrispAsrTtsEngine {
 
     enum class Kind(val fileName: String, val label: String, val prefKey: String) {
         MODEL("breeze-model.gguf", "模型文件", "model_name"),
-        CODEC("breeze-codec.gguf", "codec 文件", "codec_name")
+        CODEC("qwen3-tts-tokenizer-12hz.gguf", "codec 文件", "codec_name")
     }
 
     data class State(
@@ -95,6 +95,7 @@ object CrispAsrTtsEngine {
     @Volatile private var voiceApplied: Boolean = false
     @Volatile private var nativeLogFile: File? = null
     @Volatile private var backendName: String? = null
+    @Volatile private var loadNotes: String = ""
 
     fun isLoaded(): Boolean = session != null
 
@@ -113,6 +114,12 @@ object CrispAsrTtsEngine {
     /** 进入设置页时调用：按磁盘上的文件重新算"已导入"状态 */
     fun refresh(context: Context) {
         val app = context.applicationContext
+        // 旧版本把 codec 存成 breeze-codec.gguf，改成官方文件名
+        run {
+            val legacy = File(dir(app), "breeze-codec.gguf")
+            val canonical = fileOf(app, Kind.CODEC)
+            if (legacy.isFile && !canonical.exists()) legacy.renameTo(canonical)
+        }
         val p = prefs(app)
         fun nameOf(kind: Kind): String? {
             val f = fileOf(app, kind)
@@ -248,12 +255,14 @@ object CrispAsrTtsEngine {
             _state.update { it.copy(loading = true, loaded = false, error = null) }
             try {
                 installNativeLogCapture(app)
+                val loadLogStart = nativeLogFile?.length() ?: 0L
                 val lib = nativeApi()
                 val threads = PerfPrefs.ttsThreads(app)
                 val s = lib.crispasr_session_open(modelFile.absolutePath, threads)
                     ?: throw IllegalStateException("模型打不开：可能是 so 里没有 breeze 后端，或内存不足")
                 val rc = lib.crispasr_session_set_codec_path(s, codecFile.absolutePath)
                 if (rc != 0) SecureLog.w(TAG, "set_codec_path 返回 $rc")
+                var voiceRc: Int? = null
 
                 // 自定义音色：有参考录音就设成当前音色（必须在 codec 设置之后，编码参考音频要用 codec）
                 var voiceOk = false
@@ -261,6 +270,7 @@ object CrispAsrTtsEngine {
                 if (vf.isFile && vf.length() > 0L) {
                     val refText = prefs(app).getString(PREF_VOICE_TEXT, null)?.trim().orEmpty()
                     val vrc = lib.crispasr_session_set_voice(s, vf.absolutePath, refText.ifEmpty { null })
+                    voiceRc = vrc
                     if (vrc != 0) {
                         runCatching { lib.crispasr_session_close(s) }
                         throw IllegalStateException(
@@ -271,6 +281,14 @@ object CrispAsrTtsEngine {
                     voiceOk = true
                 }
                 voiceApplied = voiceOk
+                // 记下加载阶段的返回码和原生日志，合成失败时一起显示，方便排查
+                loadNotes = buildString {
+                    append("codec=").append(codecFile.name).append(" (").append(codecFile.length() / 1024 / 1024).append("MB)")
+                    append(" 设置返回码=").append(rc)
+                    voiceRc?.let { append(" 音色返回码=").append(it) }
+                    val l = nativeLogTail(loadLogStart)
+                    if (l.isNotBlank()) append("\n").append(l)
+                }
                 val backend = runCatching { lib.crispasr_session_backend(s) }.getOrNull()
                 backendName = backend
                 sampleRate = runCatching { lib.crispasr_session_output_sample_rate(s) }.getOrDefault(0)
@@ -498,6 +516,7 @@ object CrispAsrTtsEngine {
             val sb = StringBuilder("合成失败（后端=${backendName ?: "未知"}，样本数=${count.value}，字数=${text.length}）")
             if (!detail.isNullOrBlank()) sb.append("\n错误：").append(detail)
             if (nativeLog.isNotBlank()) sb.append("\n原生日志：").append(nativeLog)
+            if (loadNotes.isNotBlank()) sb.append("\n加载信息：").append(loadNotes)
             throw IllegalStateException(sb.toString())
         }
         try {
