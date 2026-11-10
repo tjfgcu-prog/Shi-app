@@ -541,7 +541,7 @@ private fun BreezeModeCard(
             )
             state.loading -> Triple("正在加载模型到内存…（可能要几十秒）", PetalPrimary, PetalPrimaryContainer.copy(alpha = 0.4f))
             state.error != null -> Triple("失败: ${state.error}", PetalError, PetalError.copy(alpha = 0.1f))
-            state.loaded -> Triple("已加载 · Breeze TTS 2", PetalGreen, PetalGreen.copy(alpha = 0.12f))
+            state.loaded -> Triple("已加载 · ${state.backend ?: "Breeze TTS 2"}", PetalGreen, PetalGreen.copy(alpha = 0.12f))
             state.filesReady -> Triple("文件已就绪 · 打开下面的开关加载", PetalPrimary, PetalPrimaryContainer.copy(alpha = 0.4f))
             else -> Triple("请先选择模型文件和 codec 文件", textSecondaryColor, textSecondaryColor.copy(alpha = 0.08f))
         }
