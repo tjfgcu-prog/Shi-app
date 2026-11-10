@@ -33,8 +33,10 @@ class CrispAsrTtsProvider : TtsProviderInterface, ConfigurableTtsProvider {
         speedOverride: Float?
     ): String? = withContext(Dispatchers.IO) {
         try {
-            if (!CrispAsrTtsEngine.isLoaded()) {
-                lastError = "Breeze 模型未加载，请先在语音设置里打开「加载到内存」开关"
+            // 没加载就自动加载（重启 App 后不用再手动开开关）；文件没导入或加载失败才放弃
+            if (!CrispAsrTtsEngine.ensureLoaded(context)) {
+                lastError = CrispAsrTtsEngine.state.value.error
+                    ?: "Breeze 模型文件还没导入完整，请到语音设置 → Breeze 里导入模型和 codec"
                 SecureLog.w(TAG, lastError ?: "")
                 return@withContext null
             }
