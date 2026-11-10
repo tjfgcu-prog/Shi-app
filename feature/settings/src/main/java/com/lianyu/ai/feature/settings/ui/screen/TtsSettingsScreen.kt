@@ -509,6 +509,14 @@ private fun BreezeModeCard(
     val state by CrispAsrTtsEngine.state.collectAsState()
     LaunchedEffect(Unit) { CrispAsrTtsEngine.refresh(context) }
 
+    // 自定义音色：文字稿 + 同意确认；picker 回调里读到的永远是最新值
+    var refText by remember { mutableStateOf("") }
+    var consent by remember { mutableStateOf(false) }
+    LaunchedEffect(state.voiceText) { if (refText.isEmpty()) refText = state.voiceText }
+    val voicePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) CrispAsrTtsEngine.importVoice(context, uri, refText, consent)
+    }
+
     val modelPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) CrispAsrTtsEngine.startImport(context, uri, CrispAsrTtsEngine.Kind.MODEL)
     }
@@ -596,7 +604,57 @@ private fun BreezeModeCard(
                 contentColor = PetalError,
                 disabledContentColor = textSecondaryColor.copy(alpha = 0.4f)
             )
-        ) { Text("删除已导入的文件", fontSize = 13.sp) }
+        ) { Text("删除已导入的模型文件", fontSize = 13.sp) }
+
+        HorizontalDivider(color = textSecondaryColor.copy(alpha = 0.15f))
+
+        // ── 自定义音色 ──
+        Text("自定义音色（可选）", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = textPrimaryColor)
+        Text(
+            "上传一段已获得本人同意的录音，之后合成就一直用这个音色。" +
+                "要求：WAV 格式，单人说话、干净无噪音，2–30 秒（5–15 秒效果最好），并填写录音的逐字文字稿。",
+            fontSize = 12.sp, color = textSecondaryColor
+        )
+        OutlinedTextField(
+            value = refText,
+            onValueChange = { refText = it },
+            label = { Text("录音的逐字文字稿（必须和录音一致）") },
+            modifier = Modifier.fillMaxWidth(),
+            minLines = 2,
+            enabled = !busy
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth().clickable(enabled = !busy) { consent = !consent },
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Checkbox(checked = consent, onCheckedChange = { consent = it }, enabled = !busy)
+            Text(
+                "我确认这段声音是我自己的，或其所有者已明确同意用于语音合成",
+                fontSize = 12.sp, color = textPrimaryColor, modifier = Modifier.weight(1f)
+            )
+        }
+        OutlinedButton(
+            onClick = { voicePicker.launch(arrayOf("*/*")) },
+            enabled = !busy && consent && refText.isNotBlank(),
+            modifier = Modifier.fillMaxWidth().height(42.dp), shape = RoundedCornerShape(14.dp)
+        ) { Text(if (state.voiceName == null) "选择参考录音（WAV）并保存" else "更换参考录音（WAV）", fontSize = 13.sp) }
+        if (state.voiceName != null) {
+            Text(
+                "当前音色：${state.voiceName}（${"%.1f".format(state.voiceSeconds)} 秒）" +
+                    if (state.loaded && state.voiceActive) " · 使用中" else " · 加载模型后生效",
+                fontSize = 13.sp, color = textPrimaryColor
+            )
+            OutlinedButton(
+                onClick = { CrispAsrTtsEngine.deleteVoice(context) },
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth().height(42.dp), shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(1.dp, if (!busy) PetalError else textSecondaryColor.copy(alpha = 0.25f)),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = PetalError,
+                    disabledContentColor = textSecondaryColor.copy(alpha = 0.4f)
+                )
+            ) { Text("删除自定义音色（恢复默认音色）", fontSize = 13.sp) }
+        }
 
         Text(
             "需要同时导入两个 GGUF 文件。模型约 3GB，加载后占用大量内存，" +
