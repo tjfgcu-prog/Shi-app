@@ -74,7 +74,9 @@ object CrispAsrTtsEngine {
         val voiceSeconds: Float = 0f,
         val voiceText: String = "",
         /** 当前已加载的模型是否正在使用自定义音色 */
-        val voiceActive: Boolean = false
+        val voiceActive: Boolean = false,
+        /** CrispASR 识别出的后端名（如 breeze-tts-2），加载成功后显示，排查用 */
+        val backend: String? = null
     ) {
         val filesReady: Boolean get() = modelName != null && codecName != null
     }
@@ -91,6 +93,8 @@ object CrispAsrTtsEngine {
     @Volatile private var session: Pointer? = null
     @Volatile private var sampleRate: Int = 24000
     @Volatile private var voiceApplied: Boolean = false
+    @Volatile private var nativeLogFile: File? = null
+    @Volatile private var backendName: String? = null
 
     fun isLoaded(): Boolean = session != null
 
@@ -216,6 +220,19 @@ object CrispAsrTtsEngine {
         scope.launch { loadInternal(app) }
     }
 
+    /**
+     * 确保模型已在内存里：没加载但文件齐全就现场加载（重启 App 后第一次语音回复会走这里）。
+     * 返回是否可以合成；失败原因在 [state] 的 error 里。
+     */
+    suspend fun ensureLoaded(context: Context): Boolean {
+        if (session != null) return true
+        val app = context.applicationContext
+        refresh(app)
+        if (!_state.value.filesReady) return false
+        loadInternal(app)
+        return session != null
+    }
+
     private suspend fun loadInternal(app: Context) {
         mutex.withLock {
             if (session != null) {
@@ -230,6 +247,7 @@ object CrispAsrTtsEngine {
             }
             _state.update { it.copy(loading = true, loaded = false, error = null) }
             try {
+                installNativeLogCapture(app)
                 val lib = nativeApi()
                 val threads = PerfPrefs.ttsThreads(app)
                 val s = lib.crispasr_session_open(modelFile.absolutePath, threads)
@@ -254,11 +272,12 @@ object CrispAsrTtsEngine {
                 }
                 voiceApplied = voiceOk
                 val backend = runCatching { lib.crispasr_session_backend(s) }.getOrNull()
+                backendName = backend
                 sampleRate = runCatching { lib.crispasr_session_output_sample_rate(s) }.getOrDefault(0)
                     .takeIf { it > 0 } ?: 24000
                 session = s
                 SecureLog.i(TAG, "Breeze 已加载 backend=$backend sampleRate=$sampleRate threads=$threads")
-                _state.update { it.copy(loading = false, loaded = true, error = null, voiceActive = voiceOk) }
+                _state.update { it.copy(loading = false, loaded = true, error = null, voiceActive = voiceOk, backend = backend) }
             } catch (t: Throwable) {
                 if (t is CancellationException) throw t
                 SecureLog.e(TAG, "加载失败", t)
@@ -272,7 +291,7 @@ object CrispAsrTtsEngine {
     fun unload() {
         scope.launch {
             mutex.withLock { unloadLocked() }
-            _state.update { it.copy(loaded = false, loading = false, voiceActive = false) }
+            _state.update { it.copy(loaded = false, loading = false, voiceActive = false, backend = null) }
         }
     }
 
@@ -465,16 +484,57 @@ object CrispAsrTtsEngine {
         val s = session ?: throw IllegalStateException("Breeze 模型未加载，请先在语音设置里打开开关")
         val lib = api ?: throw IllegalStateException("原生库未初始化")
         val count = IntByReference(0)
+        val logStart = nativeLogFile?.length() ?: 0L
         val ptr = lib.crispasr_session_synthesize(s, text, count)
         if (ptr == null || count.value <= 0) {
-            val detail = runCatching { lib.crispasr_session_last_synth_error(s) }.getOrNull()
-            throw IllegalStateException("合成失败" + (detail?.takeIf { it.isNotBlank() }?.let { "：$it" } ?: ""))
+            if (ptr != null) runCatching { lib.crispasr_pcm_free(ptr) }
+            val detail = try {
+                lib.crispasr_session_last_synth_error(s)
+            } catch (t: Throwable) {
+                "（读取错误详情失败：${t.message}）"
+            }
+            val nativeLog = nativeLogTail(logStart)
+            SecureLog.w(TAG, "synthesize 失败 backend=$backendName samples=${count.value} detail=$detail log=$nativeLog")
+            val sb = StringBuilder("合成失败（后端=${backendName ?: "未知"}，样本数=${count.value}，字数=${text.length}）")
+            if (!detail.isNullOrBlank()) sb.append("\n错误：").append(detail)
+            if (nativeLog.isNotBlank()) sb.append("\n原生日志：").append(nativeLog)
+            throw IllegalStateException(sb.toString())
         }
         try {
             ptr.getFloatArray(0, count.value) to sampleRate
         } finally {
             lib.crispasr_pcm_free(ptr)
         }
+    }
+
+    // ── 原生日志（排查用）──
+
+    /** 把 native 层写到 stderr 的内容重定向到 cacheDir 下的文件，合成失败时把最后一段附在报错里 */
+    private fun installNativeLogCapture(app: Context) {
+        if (nativeLogFile != null) return
+        runCatching {
+            val f = File(app.cacheDir, "crispasr-native.log")
+            if (f.exists() && f.length() > 1_000_000L) f.delete()
+            val fos = java.io.FileOutputStream(f, true)
+            android.system.Os.dup2(fos.fd, android.system.OsConstants.STDERR_FILENO)
+            fos.close()
+            nativeLogFile = f
+        }.onFailure { SecureLog.w(TAG, "无法捕获原生日志：${it.message}") }
+    }
+
+    private fun nativeLogTail(fromOffset: Long): String {
+        val f = nativeLogFile ?: return ""
+        return runCatching {
+            val len = f.length()
+            val start = maxOf(fromOffset, len - 1500L).coerceAtLeast(0L)
+            if (len <= start) return@runCatching ""
+            java.io.RandomAccessFile(f, "r").use { raf ->
+                raf.seek(start)
+                val b = ByteArray((len - start).toInt())
+                raf.readFully(b)
+                String(b, Charsets.UTF_8).trim()
+            }
+        }.getOrDefault("")
     }
 
     // ── 原生库 ──
