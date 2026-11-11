@@ -25,6 +25,62 @@ jobs:
       - name: Check signing keystore
         run: test -f release.keystore || (echo "仓库根目录缺少 release.keystore，请先上传" && exit 1)
 
+      # ── CrispASR 原生库（Breeze 本地 TTS 用）──
+      # 只在缓存不存在时编译（约十分钟）；想升级 CrispASR 或重编，把下面 key 末尾的 v2 改成 v3
+      - name: Cache CrispASR native libs
+        id: crispasr-cache
+        uses: actions/cache@v4
+        with:
+          path: crispasr-so
+          key: crispasr-so-arm64-v2
+
+      - name: Build CrispASR native libs (arm64-v8a)
+        if: steps.crispasr-cache.outputs.cache-hit != 'true'
+        run: |
+          set -e
+          export ANDROID_NDK="${ANDROID_NDK_LATEST_HOME:-$ANDROID_NDK_HOME}"
+          export ANDROID_NDK_HOME="$ANDROID_NDK"
+          echo "NDK = $ANDROID_NDK"
+          git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/CrispStrobe/CrispASR.git "$RUNNER_TEMP/crispasr"
+          cd "$RUNNER_TEMP/crispasr"
+          chmod +x build-android.sh
+          # 脚本会依次编 arm64-v8a 和 armeabi-v7a。arm64 先编、能成功；
+          # 32 位 armeabi-v7a 会在 ggml 的 sgemm.cpp 报错（缺 fp16 指令），我们用不到，忽略它的失败。
+          ./build-android.sh || echo "::warning::build-android.sh 以非 0 退出（32 位失败可忽略），继续检查 arm64 产物"
+          OUT_DIR="build-android/arm64-v8a"
+          test -f "$OUT_DIR/src/libcrispasr.so" || { echo "::error::arm64 的 libcrispasr.so 没编出来"; exit 1; }
+          mkdir -p "$GITHUB_WORKSPACE/crispasr-so"
+          # 只拿 arm64 的 so；libwhisper.so 只是 libcrispasr.so 的别名，不需要
+          find "$OUT_DIR" -name '*.so' -not -path '*/CMakeFiles/*' -not -name 'libwhisper.so' -exec cp -v {} "$GITHUB_WORKSPACE/crispasr-so/" \;
+          # 原始 libcrispasr.so 带调试信息（约 194MB），strip 后才是真正要打进 APK 的大小
+          "$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip" --strip-unneeded "$GITHUB_WORKSPACE"/crispasr-so/*.so
+          ls -la "$GITHUB_WORKSPACE/crispasr-so"
+
+      - name: Install CrispASR native libs into app
+        run: |
+          set -e
+          export ANDROID_NDK="${ANDROID_NDK_LATEST_HOME:-$ANDROID_NDK_HOME}"
+          LLVM="$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64"
+          DEST=app/src/main/jniLibs/arm64-v8a
+          mkdir -p "$DEST"
+          cp -v crispasr-so/*.so "$DEST/"
+          # 打印这些库还依赖哪些库（方便排查"找不到 libxxx.so"）
+          for f in crispasr-so/*.so; do echo "== $f"; "$LLVM/bin/llvm-readelf" -d "$f" | grep NEEDED || true; done
+          NEEDED=$("$LLVM/bin/llvm-readelf" -d crispasr-so/*.so | grep NEEDED | sed 's/.*\[\(.*\)\]/\1/' | sort -u)
+          # CrispASR 用了 OpenMP，运行时库 libomp.so 在 NDK 里，必须一起打进 APK，否则加载时报 libomp.so not found
+          if echo "$NEEDED" | grep -qx "libomp.so"; then
+            OMP=$(find "$LLVM/lib" -path '*linux/aarch64/libomp.so' | head -1)
+            test -n "$OMP" || { echo "::error::NDK 里找不到 aarch64 的 libomp.so"; exit 1; }
+            cp -v "$OMP" "$DEST/"
+          fi
+          # 如果依赖共享的 C++ 运行库，也一起带上
+          if echo "$NEEDED" | grep -qx "libc++_shared.so"; then
+            CXX="$LLVM/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so"
+            test -f "$CXX" || { echo "::error::NDK 里找不到 libc++_shared.so"; exit 1; }
+            cp -v "$CXX" "$DEST/"
+          fi
+          ls -la "$DEST"
+
       - name: Build Debug APK
         run: ./gradlew assembleDebug
 
