@@ -584,7 +584,7 @@ private fun BreezeModeCard(
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Text("加载到内存", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = textPrimaryColor)
-                Text("关闭只释放内存，不会删除文件；重启 App 后需要重新打开", fontSize = 12.sp, color = textSecondaryColor)
+                Text("关闭只释放内存，不会删除文件；重启 App 后，第一次用到语音时会自动加载", fontSize = 12.sp, color = textSecondaryColor)
             }
             Switch(
                 checked = state.loaded || state.loading,
