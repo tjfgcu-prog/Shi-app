@@ -19,6 +19,7 @@ data class TtsConfig(
         return when (provider) {
             TtsProvider.ANDROID -> true
             TtsProvider.LOCAL -> true
+            TtsProvider.BREEZE -> true
             TtsProvider.CLOUD -> minimaxApiKey.isNotBlank() && minimaxGroupId.isNotBlank()
         }
     }
