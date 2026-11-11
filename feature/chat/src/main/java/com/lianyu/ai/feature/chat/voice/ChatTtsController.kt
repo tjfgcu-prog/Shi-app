@@ -48,8 +48,14 @@ class ChatTtsController(
         val path = try {
             // 多段回复会同时排队合成：先串行（超时只从轮到自己时开始算），
             // 并且本地 VITS 在 LLM 同时推理（如剧情摘要）时会很慢，10 秒太短 → 放宽到 60 秒。
+            // Breeze（3B 参数）在手机上很慢，而且重启 App 后第一条还要先加载模型，给足时间
+            val timeoutMs = if (ttsService.getCurrentProvider() == com.lianyu.ai.network.tts.TtsProvider.BREEZE) {
+                BREEZE_SYNTH_TIMEOUT_MS
+            } else {
+                LOCAL_SYNTH_TIMEOUT_MS
+            }
             synthMutex.withLock {
-                withTimeoutOrNull(LOCAL_SYNTH_TIMEOUT_MS) { ttsService.synthesize(cleaned, null, speed, sid) }
+                withTimeoutOrNull(timeoutMs) { ttsService.synthesize(cleaned, null, speed, sid) }
             }
         } catch (e: Exception) {
             SecureLog.e("ChatTtsController", "synthesizeVoiceReply failed", e)
@@ -80,6 +86,7 @@ class ChatTtsController(
     private companion object {
         val synthMutex = Mutex()
         const val LOCAL_SYNTH_TIMEOUT_MS = 60_000L
+        const val BREEZE_SYNTH_TIMEOUT_MS = 240_000L
     }
 
     /** 保留空实现：ChatViewModel 里如果还有旧的 stop() 调用不至于编译报错，可直接删掉调用处 */
