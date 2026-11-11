@@ -84,9 +84,14 @@ fun ChatDetailScreen(
         factory = ChatViewModelFactory(context.applicationContext as Application, companionId)
     )
     val companionData by viewModel.companionData.collectAsState()
+    // 进入聊天页就预热 Breeze 模型（只在 Breeze + 语音回复开启时才会真的加载）
+    androidx.compose.runtime.LaunchedEffect(Unit) { viewModel.warmUpVoiceIfNeeded() }
     val settings by store.settingsFlow(companionId).collectAsState(initial = com.lianyu.ai.feature.chat.data.CompanionChatDetailSettings())
     val appSettingsStore = remember { AppSettingsStore(context) }
     val innerThoughtEnabled by appSettingsStore.innerThoughtEnabledFlow(companionId).collectAsState(initial = false)
+
+    // 当前语音引擎：只有「本地漫剧女声」才有音色编号可选，Breeze/系统/云端都没有
+    val ttsProvider = remember { com.lianyu.ai.network.tts.TtsService.getInstance(context).getCurrentProvider() }
 
     // 当前本地语音模型的最大音色编号（用于音色滑块范围）
     val maxSid by androidx.compose.runtime.produceState(0) {
@@ -322,6 +327,7 @@ fun ChatDetailScreen(
                     sid = settings.voiceSid,
                     speed = settings.voiceSpeed,
                     maxSid = maxSid,
+                    provider = ttsProvider,
                     onSidChange = { v -> scope.launch { store.updateSettings(companionId) { it.copy(voiceSid = v) } } },
                     onSpeedChange = { v -> scope.launch { store.updateSettings(companionId) { it.copy(voiceSpeed = v) } } },
                     onPreview = { s, sp -> viewModel.previewVoice(s, sp) }
@@ -624,20 +630,38 @@ private fun CompanionVoiceSettings(
     sid: Int,
     speed: Float,
     maxSid: Int,
+    provider: com.lianyu.ai.network.tts.TtsProvider,
     onSidChange: (Int) -> Unit,
     onSpeedChange: (Float) -> Unit,
     onPreview: (Int?, Float?) -> Unit
 ) {
     var draftSid by remember(sid) { mutableStateOf(sid.coerceAtLeast(0).toFloat()) }
     var draftSpeed by remember(speed) { mutableStateOf(if (speed > 0f) speed else 1.0f) }
+    val isBreeze = provider == com.lianyu.ai.network.tts.TtsProvider.BREEZE
+    val supportsSid = provider == com.lianyu.ai.network.tts.TtsProvider.LOCAL
+    val supportsSpeed = !isBreeze
 
-    SettingsToggleRow(
-        title = "单独设置音色",
-        subtitle = if (sid >= 0) "本角色使用音色 #$sid" else "使用语音设置里的全局音色",
-        checked = sid >= 0,
-        onCheckedChange = { enabled -> onSidChange(if (enabled) draftSid.toInt().coerceIn(0, maxSid) else -1) }
-    )
-    if (sid >= 0 && maxSid > 0) {
+    if (supportsSid) {
+        SettingsToggleRow(
+            title = "单独设置音色",
+            subtitle = if (sid >= 0) "本角色使用音色 #$sid" else "使用语音设置里的全局音色",
+            checked = sid >= 0,
+            onCheckedChange = { enabled -> onSidChange(if (enabled) draftSid.toInt().coerceIn(0, maxSid) else -1) }
+        )
+    } else {
+        Text(
+            text = if (isBreeze) {
+                "当前语音引擎是 Breeze：它没有音色编号，所有角色共用同一个音色，" +
+                    "在「语音设置 → Breeze → 自定义音色」里设置。"
+            } else {
+                "当前语音引擎没有音色编号可选，音色在语音设置里统一设置。"
+            },
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)
+        )
+    }
+    if (supportsSid && sid >= 0 && maxSid > 0) {
         Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
             Text(
                 text = "音色 #${draftSid.toInt()} / $maxSid",
@@ -659,13 +683,13 @@ private fun CompanionVoiceSettings(
         }
     }
 
-    SettingsToggleRow(
+    if (supportsSpeed) SettingsToggleRow(
         title = "单独设置语速",
         subtitle = if (speed > 0f) "本角色语速 ${String.format("%.1f", speed)}" else "使用语音设置里的全局语速",
         checked = speed > 0f,
         onCheckedChange = { enabled -> onSpeedChange(if (enabled) String.format("%.1f", draftSpeed).toFloat() else 0f) }
     )
-    if (speed > 0f) {
+    if (supportsSpeed && speed > 0f) {
         Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
             Text(
                 text = "语速 ${String.format("%.1f", draftSpeed)}",
@@ -693,15 +717,15 @@ private fun CompanionVoiceSettings(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = "仅「本地」语音能选音色；语速本地和云端都生效",
+            text = if (isBreeze) "Breeze 暂不支持调语速" else "仅「本地」语音能选音色；语速本地和云端都生效",
             fontSize = 11.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f)
         )
         TextButton(onClick = {
             onPreview(
-                if (sid >= 0) draftSid.toInt().coerceIn(0, maxSid) else null,
-                if (speed > 0f) draftSpeed else null
+                if (supportsSid && sid >= 0) draftSid.toInt().coerceIn(0, maxSid) else null,
+                if (supportsSpeed && speed > 0f) draftSpeed else null
             )
         }) { Text("试听") }
     }
