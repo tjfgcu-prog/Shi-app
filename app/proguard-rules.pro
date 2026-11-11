@@ -189,3 +189,12 @@
 
 -dontwarn org.apache.commons.codec.**
 
+
+# ═══════════════════════════════════════════════════════════════
+# JNA + CrispASR（Breeze 本地 TTS）：JNA 靠反射调用 native，不能被混淆/裁剪
+# ═══════════════════════════════════════════════════════════════
+-keep class com.sun.jna.** { *; }
+-keepclassmembers class * extends com.sun.jna.** { public *; }
+-keep class com.lianyu.ai.network.tts.CrispAsrNative { *; }
+-dontwarn java.awt.**
+-dontwarn com.sun.jna.**
