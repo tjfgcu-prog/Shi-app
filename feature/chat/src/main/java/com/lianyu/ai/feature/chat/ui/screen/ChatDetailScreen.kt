@@ -84,8 +84,6 @@ fun ChatDetailScreen(
         factory = ChatViewModelFactory(context.applicationContext as Application, companionId)
     )
     val companionData by viewModel.companionData.collectAsState()
-    // 进入聊天页就预热 Breeze 模型（只在 Breeze + 语音回复开启时才会真的加载）
-    androidx.compose.runtime.LaunchedEffect(Unit) { viewModel.warmUpVoiceIfNeeded() }
     val settings by store.settingsFlow(companionId).collectAsState(initial = com.lianyu.ai.feature.chat.data.CompanionChatDetailSettings())
     val appSettingsStore = remember { AppSettingsStore(context) }
     val innerThoughtEnabled by appSettingsStore.innerThoughtEnabledFlow(companionId).collectAsState(initial = false)
