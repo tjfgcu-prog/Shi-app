@@ -31,8 +31,9 @@ import java.io.File
  *   - voice.wav          （可选）自定义音色的参考录音；配套文字稿存在 SharedPreferences
  *     有参考录音时，每次加载模型都会自动设置为当前音色，之后所有合成都用这个音色。
  *
- * 加载：开关打开 = 加载进内存；关闭 = 释放内存（不删文件）。
- * 加载状态不落盘：进程重启后自动回到"未加载"，和本地 LLM 的开关一致。
+ * 加载：设置页开关打开 = 加载进内存；关闭 = 释放内存（不删文件）。
+ * 加载状态不落盘：进程重启后回到"未加载"，之后第一次真正用到语音时会自动加载（见 [ensureLoaded]），
+ * 和本地聊天模型"用到时自动加载"的行为一致。
  *
  * 复制 / 加载 / 删除都在引擎自己的协程里跑，退出设置页不会中断复制。
  */
@@ -99,7 +100,7 @@ object CrispAsrTtsEngine {
 
     fun isLoaded(): Boolean = session != null
 
-    fun dir(context: Context): File =
+    private fun dir(context: Context): File =
         File(File(context.applicationContext.filesDir, "models"), "tts/breeze")
 
     private fun fileOf(context: Context, kind: Kind): File = File(dir(context), kind.fileName)
@@ -114,11 +115,17 @@ object CrispAsrTtsEngine {
     /** 进入设置页时调用：按磁盘上的文件重新算"已导入"状态 */
     fun refresh(context: Context) {
         val app = context.applicationContext
-        // 旧版本把 codec 存成 breeze-codec.gguf，改成官方文件名
+        // 清理残留：旧版本把 codec 存成 breeze-codec.gguf（改成官方文件名；新文件已存在就直接删掉旧的，省几百 MB），
+        // 以及复制到一半被中断留下的 .part 临时文件（可能有好几 GB）
         run {
             val legacy = File(dir(app), "breeze-codec.gguf")
             val canonical = fileOf(app, Kind.CODEC)
-            if (legacy.isFile && !canonical.exists()) legacy.renameTo(canonical)
+            if (legacy.isFile) {
+                if (!canonical.exists()) legacy.renameTo(canonical) else legacy.delete()
+            }
+            if (_state.value.copyingLabel == null) {
+                dir(app).listFiles { f -> f.name.endsWith(".part") }?.forEach { it.delete() }
+            }
         }
         val p = prefs(app)
         fun nameOf(kind: Kind): String? {
@@ -253,6 +260,7 @@ object CrispAsrTtsEngine {
                 return
             }
             _state.update { it.copy(loading = true, loaded = false, error = null) }
+            var opened: Pointer? = null   // 已打开但还没交给 session 的会话；中途任何一步失败都要关掉，避免泄漏几 GB 内存
             try {
                 installNativeLogCapture(app)
                 val loadLogStart = nativeLogFile?.length() ?: 0L
@@ -260,6 +268,7 @@ object CrispAsrTtsEngine {
                 val threads = PerfPrefs.ttsThreads(app)
                 val s = lib.crispasr_session_open(modelFile.absolutePath, threads)
                     ?: throw IllegalStateException("模型打不开：可能是 so 里没有 breeze 后端，或内存不足")
+                opened = s
                 val rc = lib.crispasr_session_set_codec_path(s, codecFile.absolutePath)
                 if (rc != 0) SecureLog.w(TAG, "set_codec_path 返回 $rc")
                 var voiceRc: Int? = null
@@ -272,7 +281,6 @@ object CrispAsrTtsEngine {
                     val vrc = lib.crispasr_session_set_voice(s, vf.absolutePath, refText.ifEmpty { null })
                     voiceRc = vrc
                     if (vrc != 0) {
-                        runCatching { lib.crispasr_session_close(s) }
                         throw IllegalStateException(
                             "自定义音色设置失败（返回码 $vrc）。可能是这个后端暂不支持声音克隆，" +
                                 "或参考录音/文字稿有问题。可以先点「删除自定义音色」，改用默认音色"
@@ -294,9 +302,11 @@ object CrispAsrTtsEngine {
                 sampleRate = runCatching { lib.crispasr_session_output_sample_rate(s) }.getOrDefault(0)
                     .takeIf { it > 0 } ?: 24000
                 session = s
+                opened = null   // 所有权交给 session，之后由 unloadLocked 负责关闭
                 SecureLog.i(TAG, "Breeze 已加载 backend=$backend sampleRate=$sampleRate threads=$threads")
                 _state.update { it.copy(loading = false, loaded = true, error = null, voiceActive = voiceOk, backend = backend) }
             } catch (t: Throwable) {
+                opened?.let { p -> runCatching { api?.crispasr_session_close(p) } }
                 if (t is CancellationException) throw t
                 SecureLog.e(TAG, "加载失败", t)
                 val msg = if (t is UnsatisfiedLinkError) "原生库加载失败：${t.message}" else (t.message ?: t.javaClass.simpleName)
@@ -502,6 +512,7 @@ object CrispAsrTtsEngine {
         val s = session ?: throw IllegalStateException("Breeze 模型未加载，请先在语音设置里打开开关")
         val lib = api ?: throw IllegalStateException("原生库未初始化")
         val count = IntByReference(0)
+        trimNativeLog()
         val logStart = nativeLogFile?.length() ?: 0L
         val ptr = lib.crispasr_session_synthesize(s, text, count)
         if (ptr == null || count.value <= 0) {
@@ -539,6 +550,14 @@ object CrispAsrTtsEngine {
             fos.close()
             nativeLogFile = f
         }.onFailure { SecureLog.w(TAG, "无法捕获原生日志：${it.message}") }
+    }
+
+    /** 原生日志每次合成都会追加几行，超过 1MB 就清空，避免缓存目录里越积越大 */
+    private fun trimNativeLog() {
+        val f = nativeLogFile ?: return
+        if (f.length() > 1_000_000L) {
+            runCatching { java.io.RandomAccessFile(f, "rw").use { it.setLength(0L) } }
+        }
     }
 
     private fun nativeLogTail(fromOffset: Long): String {
