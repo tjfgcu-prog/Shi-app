@@ -18,6 +18,8 @@ import com.lianyu.ai.feature.chat.voice.ChatTtsController
 import com.lianyu.ai.database.model.MessageType
 import com.lianyu.ai.common.AppSettingsStore
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -53,6 +55,9 @@ import kotlinx.coroutines.withTimeoutOrNull
  * @param application Application（用于微信广播）
  * @param questionRegex 问句正则（追问触发判断）
  */
+/** 语音合成升级任务专用的应用级作用域：不随聊天页销毁而取消 */
+private val voiceUpgradeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
 class AiResponseFinalizer(
     private val companionId: Long,
     private val chatRepository: ChatRepository,
@@ -269,8 +274,12 @@ class AiResponseFinalizer(
      */
     private fun scheduleVoiceUpgrade(messageId: Long, text: String) {
         if (!chatTtsController.isVoiceReplyEnabled()) return
-        applicationApiScope.launch {
+        // 注意：这里必须用真正的应用级作用域 voiceUpgradeScope。
+        // applicationApiScope 是 ChatViewModel 实例级的，离开聊天页（onCleared）就会被取消，
+        // 合成慢的引擎（如 Breeze）会因此半途失败。
+        voiceUpgradeScope.launch {
             try {
+                val startedAt = System.currentTimeMillis()
                 val result = chatTtsController.synthesizeVoiceReply(text)
                 if (result != null) {
                     val (path, duration) = result
@@ -279,6 +288,7 @@ class AiResponseFinalizer(
                         com.lianyu.ai.common.VoiceMessageCodec.encode(duration, text),
                         path
                     )
+                    ChatDebugLog.log("[TTS] 语音合成成功 id=$messageId, 耗时=${System.currentTimeMillis() - startedAt}ms, 语音${duration}秒")
                 } else {
                     SecureLog.w("ChatViewModel", "voice synthesis failed, message stays as text (id=$messageId)")
                     ChatDebugLog.log("[TTS] 语音合成失败/超时，消息保持文字 id=$messageId, 原因=${com.lianyu.ai.network.tts.CrispAsrTtsProvider.lastError ?: com.lianyu.ai.network.tts.SherpaLocalTtsProvider.lastError}")
