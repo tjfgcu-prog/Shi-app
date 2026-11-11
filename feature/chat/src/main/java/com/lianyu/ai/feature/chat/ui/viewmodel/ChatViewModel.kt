@@ -943,18 +943,6 @@ class ChatViewModel(
 
     
 
-    /**
-     * 进入聊天页时预热：当前语音引擎是 Breeze 且开了语音回复，就提前把模型加载进内存，
-     * 避免重启 App 后第一条语音要等很久。
-     */
-    fun warmUpVoiceIfNeeded() {
-        if (chatTtsController.isVoiceReplyEnabled() &&
-            ttsService.getCurrentProvider() == com.lianyu.ai.network.tts.TtsProvider.BREEZE
-        ) {
-            com.lianyu.ai.network.tts.CrispAsrTtsEngine.preloadIfReady(getApplication<Application>())
-        }
-    }
-
     private fun showToast(message: String) {
         android.os.Handler(android.os.Looper.getMainLooper()).post {
             android.widget.Toast.makeText(getApplication<Application>(), message, android.widget.Toast.LENGTH_SHORT).show()
