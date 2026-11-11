@@ -15,13 +15,7 @@ import kotlinx.coroutines.withContext
  *
  * 暂不支持：语速覆盖（Breeze 没有语速参数）、sid 音色（单音色）。
  */
-class CrispAsrTtsProvider : TtsProviderInterface, ConfigurableTtsProvider {
-
-    private var config: TtsConfig = TtsConfig()
-
-    override fun updateConfig(config: TtsConfig) {
-        this.config = config
-    }
+class CrispAsrTtsProvider : TtsProviderInterface {
 
     override suspend fun synthesize(context: Context, text: String, voiceId: String?): String? =
         synthesize(context, text, voiceId, null)
