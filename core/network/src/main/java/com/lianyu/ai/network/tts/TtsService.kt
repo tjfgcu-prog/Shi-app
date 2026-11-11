@@ -17,6 +17,7 @@ class TtsService(private val context: Context) {
     init {
         providers[TtsProvider.ANDROID] = androidTts
         providers[TtsProvider.LOCAL] = sherpaLocalTts
+        providers[TtsProvider.BREEZE] = CrispAsrTtsProvider()
         providers[TtsProvider.CLOUD] = MinimaxTtsProvider()
         // [FIX] 进程重启后，必须从 SharedPreferences 恢复"上次选的引擎"和音色/语速。
         // 以前 currentProvider 永远从 ANDROID 起步，只有打开语音设置页点保存才会切到 LOCAL，
