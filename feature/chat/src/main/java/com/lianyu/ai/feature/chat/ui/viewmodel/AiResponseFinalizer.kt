@@ -26,6 +26,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 
+/** 语音合成升级任务专用的进程级作用域：不随聊天页销毁而取消 */
+private val voiceUpgradeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
 /**
  * AI 回复落地处理器（从 ChatViewModel 抽取，方案B：独立类 + 委托存根）。
  *
@@ -55,9 +58,6 @@ import kotlinx.coroutines.withTimeoutOrNull
  * @param application Application（用于微信广播）
  * @param questionRegex 问句正则（追问触发判断）
  */
-/** 语音合成升级任务专用的应用级作用域：不随聊天页销毁而取消 */
-private val voiceUpgradeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
 class AiResponseFinalizer(
     private val companionId: Long,
     private val chatRepository: ChatRepository,
@@ -268,15 +268,12 @@ class AiResponseFinalizer(
 
     /**
      * 语音回复模式下，消息文字先落库展示，这里异步合成语音，成功后把该消息原地升级为语音气泡。
-     * 用 applicationApiScope（应用级作用域）而不是当前请求的协程作用域，
-     * 这样即使用户切走聊天页、当前请求被取消，语音合成仍会继续完成并正确更新消息。
+     * 用进程级作用域 [voiceUpgradeScope]（不是 applicationApiScope：它属于 ChatViewModel 实例，
+     * 离开聊天页 onCleared 时会被取消），这样用户切走聊天页后，语音合成仍会继续完成并正确更新消息。
      * 合成失败或超时：消息保持文字形式，不影响消息本身已经展示。
      */
     private fun scheduleVoiceUpgrade(messageId: Long, text: String) {
         if (!chatTtsController.isVoiceReplyEnabled()) return
-        // 注意：这里必须用真正的应用级作用域 voiceUpgradeScope。
-        // applicationApiScope 是 ChatViewModel 实例级的，离开聊天页（onCleared）就会被取消，
-        // 合成慢的引擎（如 Breeze）会因此半途失败。
         voiceUpgradeScope.launch {
             try {
                 val startedAt = System.currentTimeMillis()
