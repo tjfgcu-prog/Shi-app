@@ -4,6 +4,8 @@ package com.lianyu.ai.feature.settings.ui.screen
 
 import android.content.Context
 import android.media.MediaPlayer
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -23,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CloudQueue
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
@@ -170,7 +173,11 @@ fun TtsSettingsScreen(
                     }
                 }
                 else -> {
-    val diagnostic = if (selectedProvider == TtsProvider.LOCAL) SherpaLocalTtsProvider.lastError else null
+    val diagnostic = when (selectedProvider) {
+        TtsProvider.LOCAL -> SherpaLocalTtsProvider.lastError
+        TtsProvider.BREEZE -> CrispAsrTtsProvider.lastError
+        else -> null
+    }
     testResult = "✗ 合成失败${diagnostic?.let { "：$it" } ?: ""}"
                 }
             }
@@ -262,6 +269,10 @@ fun TtsSettingsScreen(
                                         cardBg = cardBg, textPrimaryColor = textPrimaryColor, textSecondaryColor = textSecondaryColor,
                                         context = context
                                     )
+                                    TtsProvider.BREEZE -> BreezeModeCard(
+                                        cardBg = cardBg, textPrimaryColor = textPrimaryColor, textSecondaryColor = textSecondaryColor,
+                                        context = context
+                                    )
                                     TtsProvider.CLOUD -> CloudModeCard(
                                         apiKey = minimaxApiKey, onApiKeyChange = { minimaxApiKey = it },
                                         groupId = minimaxGroupId, onGroupIdChange = { minimaxGroupId = it },
@@ -344,7 +355,7 @@ private fun TtsToggleCard(
     }
 }
 
-/** 三段式模式选择：系统 / 本地 / 云端 */
+/** 四段式模式选择：系统 / 本地 / Breeze / 云端 */
 @Composable
 private fun ModeSegmentedControl(
     selected: TtsProvider, onSelect: (TtsProvider) -> Unit,
@@ -353,6 +364,7 @@ private fun ModeSegmentedControl(
     val options = listOf(
         Triple(TtsProvider.ANDROID, "系统", Icons.Filled.PhoneAndroid),
         Triple(TtsProvider.LOCAL, "本地", Icons.Filled.SdStorage),
+        Triple(TtsProvider.BREEZE, "Breeze", Icons.Filled.GraphicEq),
         Triple(TtsProvider.CLOUD, "云端", Icons.Filled.CloudQueue)
     )
     Row(
@@ -486,6 +498,191 @@ private fun LocalModeCard(
         }
 
         Text("离线端上推理，无需联网，隐私更好。", fontSize = 12.sp, color = textSecondaryColor)
+    }
+}
+
+/** Breeze 本地模式卡片：手动选 GGUF 复制进 App，开关控制加载/卸载 */
+@Composable
+private fun BreezeModeCard(
+    cardBg: Color, textPrimaryColor: Color, textSecondaryColor: Color, context: Context
+) {
+    val state by CrispAsrTtsEngine.state.collectAsState()
+    LaunchedEffect(Unit) { CrispAsrTtsEngine.refresh(context) }
+
+    // 自定义音色：文字稿 + 同意确认；picker 回调里读到的永远是最新值
+    var refText by remember { mutableStateOf("") }
+    var consent by remember { mutableStateOf(false) }
+    LaunchedEffect(state.voiceText) { if (refText.isEmpty()) refText = state.voiceText }
+    val voicePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) CrispAsrTtsEngine.importVoice(context, uri, refText, consent)
+    }
+
+    val modelPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) CrispAsrTtsEngine.startImport(context, uri, CrispAsrTtsEngine.Kind.MODEL)
+    }
+    val codecPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) CrispAsrTtsEngine.startImport(context, uri, CrispAsrTtsEngine.Kind.CODEC)
+    }
+
+    val copying = state.copyingLabel != null
+    val busy = copying || state.loading
+    val copiedMb = state.copiedBytes / 1024 / 1024
+    val totalMb = state.totalBytes / 1024 / 1024
+
+    Column(
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(cardBg).padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        // 状态条
+        val (statusText, statusColor, statusBg) = when {
+            copying -> Triple(
+                "正在复制${state.copyingLabel}… " + if (totalMb > 0) "$copiedMb / $totalMb MB" else "$copiedMb MB",
+                PetalPrimary, PetalPrimaryContainer.copy(alpha = 0.4f)
+            )
+            state.loading -> Triple("正在加载模型到内存…（可能要几十秒）", PetalPrimary, PetalPrimaryContainer.copy(alpha = 0.4f))
+            state.error != null -> Triple("失败: ${state.error}", PetalError, PetalError.copy(alpha = 0.1f))
+            state.loaded -> Triple("已加载 · ${state.backend ?: "Breeze TTS 2"}", PetalGreen, PetalGreen.copy(alpha = 0.12f))
+            state.filesReady -> Triple("文件已就绪 · 打开下面的开关加载", PetalPrimary, PetalPrimaryContainer.copy(alpha = 0.4f))
+            else -> Triple("请先选择模型文件和 codec 文件", textSecondaryColor, textSecondaryColor.copy(alpha = 0.08f))
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(statusBg).padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (copying || state.loading) {
+                CircularProgressIndicator(modifier = Modifier.size(20.dp), color = statusColor, strokeWidth = 2.dp)
+                Spacer(Modifier.width(10.dp))
+            }
+            Text(statusText, fontSize = 14.sp, color = statusColor, fontWeight = FontWeight.Medium)
+        }
+        if (copying) {
+            if (state.totalBytes > 0L) {
+                LinearProgressIndicator(
+                    progress = { (state.copiedBytes.toFloat() / state.totalBytes.toFloat()).coerceIn(0f, 1f) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            } else {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            }
+        }
+
+        // 两个文件
+        BreezeFileRow(
+            label = "模型文件", hint = "例如 breeze-tts-2-q8_0.gguf", fileName = state.modelName,
+            enabled = !busy, onPick = { modelPicker.launch(arrayOf("*/*")) },
+            textPrimaryColor = textPrimaryColor, textSecondaryColor = textSecondaryColor
+        )
+        BreezeFileRow(
+            label = "codec 文件", hint = "例如 qwen3-tts-tokenizer-12hz.gguf", fileName = state.codecName,
+            enabled = !busy, onPick = { codecPicker.launch(arrayOf("*/*")) },
+            textPrimaryColor = textPrimaryColor, textSecondaryColor = textSecondaryColor
+        )
+
+        HorizontalDivider(color = textSecondaryColor.copy(alpha = 0.15f))
+
+        // 加载开关：开 = 加载进内存，关 = 释放内存（不删文件）
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("加载到内存", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = textPrimaryColor)
+                Text("关闭只释放内存，不会删除文件；重启 App 后需要重新打开", fontSize = 12.sp, color = textSecondaryColor)
+            }
+            Switch(
+                checked = state.loaded || state.loading,
+                enabled = state.filesReady && !copying && !state.loading,
+                onCheckedChange = { on ->
+                    if (on) CrispAsrTtsEngine.load(context) else CrispAsrTtsEngine.unload()
+                }
+            )
+        }
+
+        OutlinedButton(
+            onClick = { CrispAsrTtsEngine.deleteFiles(context) },
+            enabled = (state.modelName != null || state.codecName != null) && !busy,
+            modifier = Modifier.fillMaxWidth().height(42.dp), shape = RoundedCornerShape(14.dp),
+            border = BorderStroke(1.dp, if (!busy) PetalError else textSecondaryColor.copy(alpha = 0.25f)),
+            colors = ButtonDefaults.outlinedButtonColors(
+                contentColor = PetalError,
+                disabledContentColor = textSecondaryColor.copy(alpha = 0.4f)
+            )
+        ) { Text("删除已导入的模型文件", fontSize = 13.sp) }
+
+        HorizontalDivider(color = textSecondaryColor.copy(alpha = 0.15f))
+
+        // ── 自定义音色 ──
+        Text("自定义音色（可选）", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = textPrimaryColor)
+        Text(
+            "上传一段已获得本人同意的录音，之后合成就一直用这个音色。" +
+                "要求：WAV 格式，单人说话、干净无噪音，2–30 秒（5–15 秒效果最好），并填写录音的逐字文字稿。",
+            fontSize = 12.sp, color = textSecondaryColor
+        )
+        OutlinedTextField(
+            value = refText,
+            onValueChange = { refText = it },
+            label = { Text("录音的逐字文字稿（必须和录音一致）") },
+            modifier = Modifier.fillMaxWidth(),
+            minLines = 2,
+            enabled = !busy
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth().clickable(enabled = !busy) { consent = !consent },
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Checkbox(checked = consent, onCheckedChange = { consent = it }, enabled = !busy)
+            Text(
+                "我确认这段声音是我自己的，或其所有者已明确同意用于语音合成",
+                fontSize = 12.sp, color = textPrimaryColor, modifier = Modifier.weight(1f)
+            )
+        }
+        OutlinedButton(
+            onClick = { voicePicker.launch(arrayOf("*/*")) },
+            enabled = !busy && consent && refText.isNotBlank(),
+            modifier = Modifier.fillMaxWidth().height(42.dp), shape = RoundedCornerShape(14.dp)
+        ) { Text(if (state.voiceName == null) "选择参考录音（WAV）并保存" else "更换参考录音（WAV）", fontSize = 13.sp) }
+        if (state.voiceName != null) {
+            Text(
+                "当前音色：${state.voiceName}（${"%.1f".format(state.voiceSeconds)} 秒）" +
+                    if (state.loaded && state.voiceActive) " · 使用中" else " · 加载模型后生效",
+                fontSize = 13.sp, color = textPrimaryColor
+            )
+            OutlinedButton(
+                onClick = { CrispAsrTtsEngine.deleteVoice(context) },
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth().height(42.dp), shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(1.dp, if (!busy) PetalError else textSecondaryColor.copy(alpha = 0.25f)),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = PetalError,
+                    disabledContentColor = textSecondaryColor.copy(alpha = 0.4f)
+                )
+            ) { Text("删除自定义音色（恢复默认音色）", fontSize = 13.sp) }
+        }
+
+        Text(
+            "需要同时导入两个 GGUF 文件。模型约 3GB，加载后占用大量内存，" +
+                "和本地聊天模型一起开可能被系统杀掉进程。Breeze 模型仅限非商业使用。",
+            fontSize = 12.sp, color = textSecondaryColor
+        )
+    }
+}
+
+@Composable
+private fun BreezeFileRow(
+    label: String, hint: String, fileName: String?, enabled: Boolean, onPick: () -> Unit,
+    textPrimaryColor: Color, textSecondaryColor: Color
+) {
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(label, fontSize = 13.sp, color = textSecondaryColor)
+            Text(
+                fileName ?: "未选择（$hint）",
+                fontSize = 14.sp,
+                color = if (fileName != null) textPrimaryColor else textSecondaryColor.copy(alpha = 0.7f)
+            )
+        }
+        Spacer(Modifier.width(8.dp))
+        OutlinedButton(
+            onClick = onPick, enabled = enabled,
+            shape = RoundedCornerShape(12.dp), contentPadding = PaddingValues(horizontal = 14.dp)
+        ) { Text(if (fileName == null) "选择" else "更换", fontSize = 13.sp) }
     }
 }
 
