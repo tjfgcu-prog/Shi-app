@@ -86,10 +86,8 @@ import kotlinx.coroutines.launch
  *
  *   0. 自己设定    — 我的信息、各角色专属设定
  *   1. 记忆与管理  — 记忆管理、上下文记忆
- *   2. AI 配置    — API 设置
- *   3. 外观       — 主题模式、聊天背景
- *   4. 外观与对话  — 语言、帧率、思考设置
- *   5. 系统与维护  — TTS、Token、更新、权限
+ *   2. AI 与互动  — API 设置、语音、病娇模式
+ *   3. 外观与数据  — 主题模式、聊天背景、帧率、思考设置、Token 统计、数据备份
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -162,61 +160,30 @@ fun GeneralSettingsScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // === AI 配置 ===
+            // === AI 与互动：API 设置 / 语音 / 病娇模式 ===
             SolidMenuGroup(
                 items = listOf(
-                    MenuItemData(Icons.Filled.Settings, stringResource(R.string.api_settings), stringResource(R.string.api_settings_desc), onSettingsClick)
+                    MenuItemData(Icons.Filled.Settings, stringResource(R.string.api_settings), stringResource(R.string.api_settings_desc), onSettingsClick),
+                    MenuItemData(Icons.Filled.RecordVoiceOver, stringResource(R.string.tts_settings), stringResource(R.string.tts_settings_desc), onTtsSettingsClick),
+                    MenuItemData(Icons.Filled.Science, stringResource(R.string.yandere_mode), stringResource(R.string.yandere_mode_desc), onYandereModeClick)
                 ),
                 isVisible = isVisible, delayMillis = 60
             )
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // === 外观：主题模式 / 聊天背景 ===
-            SolidMenuGroup(
-                items = listOf(
-                    MenuItemData(Icons.Filled.Brush, stringResource(R.string.theme_mode), stringResource(R.string.theme_mode_desc), onThemeClick),
-                    MenuItemData(Icons.Filled.Palette, stringResource(R.string.chat_background), stringResource(R.string.chat_background_desc), onClick = { showBackgroundDialog = true })
-                ),
-                isVisible = isVisible, delayMillis = 100
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // === 第一组：外观与对话 ===
+            // === 外观与数据：主题 / 聊天背景 / 帧率 / 思考设置 / Token 统计 / 数据备份 ===
             val currentFrameRate = FrameRateManager.getSavedFrameRate(context)
             SolidMenuGroup(
                 items = listOf(
+                    MenuItemData(Icons.Filled.Brush, stringResource(R.string.theme_mode), stringResource(R.string.theme_mode_desc), onThemeClick),
+                    MenuItemData(Icons.Filled.Palette, stringResource(R.string.chat_background), stringResource(R.string.chat_background_desc), onClick = { showBackgroundDialog = true }),
                     MenuItemData(Icons.Filled.Refresh, stringResource(R.string.framerate), currentFrameRate.label, onFrameRateClick),
-                    
-                    ThinkingSettingsEntry()
-                ),
-                isVisible = isVisible, delayMillis = 140
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            
-
-            // === 第二组：系统与维护 ===
-            SolidMenuGroup(
-                items = listOf(
-                    MenuItemData(Icons.Filled.RecordVoiceOver, stringResource(R.string.tts_settings), stringResource(R.string.tts_settings_desc), onTtsSettingsClick),
+                    ThinkingSettingsEntry(),
                     MenuItemData(Icons.Filled.Token, stringResource(R.string.token_usage), stringResource(R.string.token_usage_desc), onTokenUsageClick),
-                    
                     MenuItemData(Icons.Filled.SaveAlt, stringResource(R.string.data_backup), stringResource(R.string.data_backup_desc), onDataBackupClick)
-                    
                 ),
-                isVisible = isVisible, delayMillis = 220
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // === 第三组：病娇模式（独立卡片）===
-            SolidMenuGroup(
-                items = listOf(
-                    MenuItemData(Icons.Filled.Science, stringResource(R.string.yandere_mode), stringResource(R.string.yandere_mode_desc), onYandereModeClick)
-                ),
-                isVisible = isVisible, delayMillis = 260
+                isVisible = isVisible, delayMillis = 100
             )
 
             Spacer(modifier = Modifier.height(80.dp))
