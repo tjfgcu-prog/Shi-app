@@ -135,7 +135,10 @@ fun TtsSettingsScreen(
             testResult = null
             saveSettings()
             if (selectedProvider == TtsProvider.ANDROID) ttsService.setProvider(TtsProvider.ANDROID)
+            val breezeWasLoaded = CrispAsrTtsEngine.isLoaded()
+            val startedAt = System.currentTimeMillis()
             val audioPath = ttsService.testWithSampleText(selectedProvider, "你好，这是一个语音合成测试。")
+            val elapsedSec = (System.currentTimeMillis() - startedAt) / 1000f
             isSynthesizing = false
             when {
                 selectedProvider == TtsProvider.ANDROID -> {
@@ -150,6 +153,7 @@ fun TtsSettingsScreen(
                     try {
                         mediaPlayer?.release()
                         previewAudioPath = audioPath
+                        var audioMs = 0
                         mediaPlayer = MediaPlayer().apply {
                             setDataSource(audioPath)
                             setOnCompletionListener { mp ->
@@ -163,9 +167,18 @@ fun TtsSettingsScreen(
                                 previewAudioPath = null
                                 true
                             }
-                            prepare(); start()
+                            prepare(); audioMs = duration; start()
                         }
-                        testResult = "✓ 合成成功，正在播放"
+                        // 合成速度：用时 ÷ 语音时长，≤1 说明合成得比说话快，聊天里能跟上
+                        val audioSec = audioMs / 1000f
+                        val speedNote = if (audioSec > 0.1f) {
+                            "\n用时 %.1f 秒 · 语音 %.1f 秒 · 合成 1 秒语音约需 %.1f 秒（≤1 才能跟上实时）"
+                                .format(elapsedSec, audioSec, elapsedSec / audioSec) +
+                                if (selectedProvider == TtsProvider.BREEZE && !breezeWasLoaded) {
+                                    "\n（这次包含模型加载时间，再点一次试听才是纯合成速度）"
+                                } else ""
+                        } else ""
+                        testResult = "✓ 合成成功，正在播放$speedNote"
                     } catch (e: Exception) {
                         runCatching { java.io.File(audioPath).delete() }
                         previewAudioPath = null
