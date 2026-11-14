@@ -26,13 +26,13 @@ jobs:
         run: test -f release.keystore || (echo "仓库根目录缺少 release.keystore，请先上传" && exit 1)
 
       # ── CrispASR 原生库（Breeze 本地 TTS 用）──
-      # 只在缓存不存在时编译（约十分钟）；想升级 CrispASR 或重编，把下面 key 末尾的 v4 改成 v5
+      # 只在缓存不存在时编译（约十分钟）；想升级 CrispASR 或重编，把下面 key 末尾的 v5 改成 v6
       - name: Cache CrispASR native libs
         id: crispasr-cache
         uses: actions/cache@v4
         with:
           path: crispasr-so
-          key: crispasr-so-arm64-v4
+          key: crispasr-so-arm64-v5
 
       - name: Build CrispASR native libs (arm64-v8a)
         if: steps.crispasr-cache.outputs.cache-hit != 'true'
@@ -44,25 +44,55 @@ jobs:
           git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/CrispStrobe/CrispASR.git "$RUNNER_TEMP/crispasr"
           cd "$RUNNER_TEMP/crispasr"
           chmod +x build-android.sh
-          # 打开手机 CPU 的加速指令：dotprod（点积）+ fp16（半精度）+ i8mm（int8 矩阵乘）。
+
+          # ── 打开手机 CPU 的加速指令：dotprod（点积）+ fp16（半精度）+ i8mm（int8 矩阵乘）──
           # 之前的编译日志里 HAVE_DOTPROD / HAVE_MATMUL_INT8 / HAVE_FP16_VECTOR_ARITHMETIC 全是 Failed，
           # 说明 ggml 只用了最基础的 NEON，Q8_0/Q4_K 的矩阵乘法会慢很多。
+          # 上一版用环境变量 CFLAGS 传参，实测没生效（脚本自己传了 cmake 参数，把它盖掉了）。
+          # 这一版直接改顶层 CMakeLists.txt：不管脚本怎么调用 cmake，参数都会生效。
           # 目标手机是天玑 9300+（4×Cortex-X4 + 4×Cortex-A720，ARMv9.2，支持 i8mm）。
-          # 注意：这个编译结果在不支持 i8mm 的旧手机上会闪退（非法指令），换手机/给别人用前要改回低档。
-          export CFLAGS="-march=armv8.6-a+dotprod+fp16+i8mm"
-          export CXXFLAGS="-march=armv8.6-a+dotprod+fp16+i8mm"
-          # 脚本会依次编 arm64-v8a 和 armeabi-v7a。arm64 先编、能成功；
-          # 32 位 armeabi-v7a 会在 ggml 的 sgemm.cpp 报错（缺 fp16 指令），我们用不到，忽略它的失败。
-          ./build-android.sh || echo "::warning::build-android.sh 以非 0 退出（32 位失败可忽略），继续检查 arm64 产物"
+          # 注意：编出来的库在不支持 i8mm 的旧手机上会闪退（非法指令），换手机/给别人用前要改回低档。
+          python3 - <<'PY'
+          import re
+          p = "CMakeLists.txt"
+          s = open(p, encoding="utf-8").read()
+          arch = "armv8.6-a+dotprod+fp16+i8mm"
+          inject = (
+              "\n# --- injected by CI: enable dotprod/i8mm on arm64 ---\n"
+              'if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64" OR ANDROID_ABI STREQUAL "arm64-v8a")\n'
+              f'  set(GGML_CPU_ARM_ARCH "{arch}" CACHE STRING "" FORCE)\n'
+              '  set(CMAKE_C_FLAGS "$' + '{CMAKE_C_FLAGS} -march=' + arch + '")\n'
+              '  set(CMAKE_CXX_FLAGS "$' + '{CMAKE_CXX_FLAGS} -march=' + arch + '")\n'
+              "endif()\n"
+          )
+          m = re.search(r"^\s*cmake_minimum_required\s*\(.*?\)\s*$", s, re.M)
+          pos = m.end() if m else 0
+          open(p, "w", encoding="utf-8").write(s[:pos] + inject + s[pos:])
+          print("已把 ARM 加速参数写入 CMakeLists.txt，位置:", pos)
+          PY
+
+          # build-android.sh 支持 --abi 参数时只编 arm64（更快，也不会再有 32 位失败）；
+          # 不支持就退回默认参数（会多编一遍 32 位，失败可忽略）。bash -x 会把脚本里实际执行的 cmake 命令全部打印出来，方便排查。
           OUT_DIR="build-android/arm64-v8a"
+          bash -x ./build-android.sh --abi arm64-v8a || echo "::warning::带 --abi 参数的编译以非 0 退出"
+          if [ ! -f "$OUT_DIR/src/libcrispasr.so" ]; then
+            echo "::warning::带 --abi 参数没有编出 arm64 产物，退回默认参数重编"
+            bash -x ./build-android.sh || echo "::warning::build-android.sh 以非 0 退出（32 位失败可忽略），继续检查 arm64 产物"
+          fi
           test -f "$OUT_DIR/src/libcrispasr.so" || { echo "::error::arm64 的 libcrispasr.so 没编出来"; exit 1; }
+
+          # 打印 ggml-cpu 实际使用的编译参数，里面应该有 -march=armv8.6-a+dotprod+fp16+i8mm
+          echo "=== ggml-cpu 实际使用的编译参数 ==="
+          find "$OUT_DIR" -path "*ggml-cpu*" -name flags.make -exec grep -h "C_FLAGS\|CXX_FLAGS" {} \; | cut -c1-400 | sort -u | head -10
+
           mkdir -p "$GITHUB_WORKSPACE/crispasr-so"
           # 只拿 arm64 的 so；libwhisper.so 只是 libcrispasr.so 的别名，不需要
           find "$OUT_DIR" -name '*.so' -not -path '*/CMakeFiles/*' -not -name 'libwhisper.so' -exec cp -v {} "$GITHUB_WORKSPACE/crispasr-so/" \;
-          # 原始 libcrispasr.so 带调试信息（约 194MB），strip 后才是真正要打进 APK 的大小
-          # 自检：libggml-cpu.so 里应该有 sdot（点积）和 smmla（int8 矩阵乘）指令。数量是 0 说明编译参数没生效，要回来看日志
+
+          # 自检：libggml-cpu.so 里应该有 sdot（点积）和 smmla（int8 矩阵乘）指令。数量是 0 说明编译参数没生效，要回来看日志。
+          # 反汇编时要告诉 objdump 这些扩展指令，不然它可能把它们当成未知指令。
           OBJDUMP="$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-objdump"
-          DIS=$("$OBJDUMP" -d "$GITHUB_WORKSPACE/crispasr-so/libggml-cpu.so")
+          DIS=$("$OBJDUMP" -d --mattr=+dotprod,+i8mm,+fp16,+bf16 "$GITHUB_WORKSPACE/crispasr-so/libggml-cpu.so")
           SDOT=$(echo "$DIS" | grep -c "sdot" || true)
           SMMLA=$(echo "$DIS" | grep -c "smmla" || true)
           echo "libggml-cpu.so 里的 sdot 指令数：$SDOT，smmla 指令数：$SMMLA"
