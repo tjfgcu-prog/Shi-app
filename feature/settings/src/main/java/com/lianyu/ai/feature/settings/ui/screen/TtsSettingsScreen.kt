@@ -178,7 +178,9 @@ fun TtsSettingsScreen(
                                     "\n（这次包含模型加载时间，再点一次试听才是纯合成速度）"
                                 } else ""
                         } else ""
-                        testResult = "✓ 合成成功，正在播放$speedNote"
+                        // 临时诊断：Breeze 的加载信息和原生日志（含各阶段耗时），排查完速度问题后删掉
+                        val diag = if (selectedProvider == TtsProvider.BREEZE) "\n\n" + CrispAsrTtsEngine.diagnostics() else ""
+                        testResult = "✓ 合成成功，正在播放$speedNote$diag"
                     } catch (e: Exception) {
                         runCatching { java.io.File(audioPath).delete() }
                         previewAudioPath = null
