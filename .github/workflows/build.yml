@@ -26,13 +26,13 @@ jobs:
         run: test -f release.keystore || (echo "仓库根目录缺少 release.keystore，请先上传" && exit 1)
 
       # ── CrispASR 原生库（Breeze 本地 TTS 用）──
-      # 只在缓存不存在时编译（约十分钟）；想升级 CrispASR 或重编，把下面 key 末尾的 v2 改成 v3
+      # 只在缓存不存在时编译（约十分钟）；想升级 CrispASR 或重编，把下面 key 末尾的 v4 改成 v5
       - name: Cache CrispASR native libs
         id: crispasr-cache
         uses: actions/cache@v4
         with:
           path: crispasr-so
-          key: crispasr-so-arm64-v2
+          key: crispasr-so-arm64-v4
 
       - name: Build CrispASR native libs (arm64-v8a)
         if: steps.crispasr-cache.outputs.cache-hit != 'true'
@@ -44,6 +44,13 @@ jobs:
           git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/CrispStrobe/CrispASR.git "$RUNNER_TEMP/crispasr"
           cd "$RUNNER_TEMP/crispasr"
           chmod +x build-android.sh
+          # 打开手机 CPU 的加速指令：dotprod（点积）+ fp16（半精度）+ i8mm（int8 矩阵乘）。
+          # 之前的编译日志里 HAVE_DOTPROD / HAVE_MATMUL_INT8 / HAVE_FP16_VECTOR_ARITHMETIC 全是 Failed，
+          # 说明 ggml 只用了最基础的 NEON，Q8_0/Q4_K 的矩阵乘法会慢很多。
+          # 目标手机是天玑 9300+（4×Cortex-X4 + 4×Cortex-A720，ARMv9.2，支持 i8mm）。
+          # 注意：这个编译结果在不支持 i8mm 的旧手机上会闪退（非法指令），换手机/给别人用前要改回低档。
+          export CFLAGS="-march=armv8.6-a+dotprod+fp16+i8mm"
+          export CXXFLAGS="-march=armv8.6-a+dotprod+fp16+i8mm"
           # 脚本会依次编 arm64-v8a 和 armeabi-v7a。arm64 先编、能成功；
           # 32 位 armeabi-v7a 会在 ggml 的 sgemm.cpp 报错（缺 fp16 指令），我们用不到，忽略它的失败。
           ./build-android.sh || echo "::warning::build-android.sh 以非 0 退出（32 位失败可忽略），继续检查 arm64 产物"
@@ -53,6 +60,14 @@ jobs:
           # 只拿 arm64 的 so；libwhisper.so 只是 libcrispasr.so 的别名，不需要
           find "$OUT_DIR" -name '*.so' -not -path '*/CMakeFiles/*' -not -name 'libwhisper.so' -exec cp -v {} "$GITHUB_WORKSPACE/crispasr-so/" \;
           # 原始 libcrispasr.so 带调试信息（约 194MB），strip 后才是真正要打进 APK 的大小
+          # 自检：libggml-cpu.so 里应该有 sdot（点积）和 smmla（int8 矩阵乘）指令。数量是 0 说明编译参数没生效，要回来看日志
+          OBJDUMP="$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-objdump"
+          DIS=$("$OBJDUMP" -d "$GITHUB_WORKSPACE/crispasr-so/libggml-cpu.so")
+          SDOT=$(echo "$DIS" | grep -c "sdot" || true)
+          SMMLA=$(echo "$DIS" | grep -c "smmla" || true)
+          echo "libggml-cpu.so 里的 sdot 指令数：$SDOT，smmla 指令数：$SMMLA"
+          [ "${SDOT:-0}" -gt 0 ] || echo "::warning::libggml-cpu.so 里没有 sdot 指令，dotprod 加速没有生效"
+          [ "${SMMLA:-0}" -gt 0 ] || echo "::warning::libggml-cpu.so 里没有 smmla 指令，i8mm 加速没有生效"
           "$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip" --strip-unneeded "$GITHUB_WORKSPACE"/crispasr-so/*.so
           ls -la "$GITHUB_WORKSPACE/crispasr-so"
 
