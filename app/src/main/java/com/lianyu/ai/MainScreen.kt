@@ -258,7 +258,15 @@ fun MainScreen(mainActivity: Activity) {
                     ChatDetailScreen(
                         companionId = detailCompanionId,
                         onNavigateBack = { navController.popBackStack() },
-                        chatViewModelStoreOwner = chatEntry
+                        chatViewModelStoreOwner = chatEntry,
+                        onOpenWorldBook = { navController.navigate(MainRoute.WorldBook(detailCompanionId).route) }
+                    )
+                }
+                composable(MainRoute.WorldBook(0).route.replace("0", "{companionId}"), arguments = listOf(navArgument("companionId") { type = NavType.LongType })) { backStackEntry ->
+                    val worldBookCompanionId = backStackEntry.arguments?.getLong("companionId") ?: 0L
+                    com.lianyu.ai.feature.chat.ui.screen.WorldBookScreen(
+                        companionId = worldBookCompanionId,
+                        onNavigateBack = { navController.popBackStack() }
                     )
                 }
                 

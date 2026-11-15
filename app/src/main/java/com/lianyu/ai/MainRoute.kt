@@ -14,6 +14,7 @@ sealed class MainRoute(val route: String) {
     // === 聊天 ===
     data class Chat(val companionId: Long) : MainRoute("chat/$companionId")
     data class ChatDetail(val companionId: Long) : MainRoute("chat_detail/$companionId")
+    data class WorldBook(val companionId: Long) : MainRoute("world_book/$companionId")
     
 
     // === 群聊 ===

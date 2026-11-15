@@ -243,6 +243,10 @@ class LianYuApplication : Application(), ImageLoaderFactory, androidx.work.Confi
             ServiceRegistry.registerSingleton(MemoryProvider::class.java) {
                 com.lianyu.ai.feature.memory.engine.MemoryManager.getInstance(app)
             }
+            // RoleplayProvider：角色扮演模式的身份行、世界书、状态卡与回复规则（feature:chat 实现，core:network 与聊天消费）
+            ServiceRegistry.registerSingleton(com.lianyu.ai.domain.RoleplayProvider::class.java) {
+                com.lianyu.ai.feature.chat.roleplay.RoleplayProviderImpl(app)
+            }
             ServiceRegistry.registerSingleton(AiServiceProvider::class.java) {
                 AiService(app)
             }
