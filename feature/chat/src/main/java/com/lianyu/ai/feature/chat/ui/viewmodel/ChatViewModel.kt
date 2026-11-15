@@ -527,7 +527,21 @@ class ChatViewModel(
         }.takeLast(2500)
 
         val role = userRepository?.selectedRole?.value ?: CompanionRole.GIRLFRIEND
-        val systemPrompt = buildString {
+        // 角色扮演模式：身份、世界书、状态卡和回复规则换成角色扮演的一套
+        val roleplay = ServiceRegistry.get(com.lianyu.ai.domain.RoleplayProvider::class.java)
+            ?.getPrompt(companionId, name, historyText + "\n" + lastUserMessage)
+        val systemPrompt = if (roleplay != null) buildString {
+            appendLine(roleplay.identityLine)
+            if (personality.isNotBlank()) appendLine("性格：$personality")
+            if (speakingStyle.isNotBlank()) appendLine("说话风格：$speakingStyle")
+            if (backstory.isNotBlank()) appendLine("背景：$backstory")
+            if (userProfileText.isNotBlank()) appendLine("\n$userProfileText")
+            if (memoryContext.isNotBlank()) appendLine("\n关于用户的记忆：$memoryContext")
+            if (storyContext.isNotBlank()) appendLine("\n$storyContext")
+            if (roleplay.contextText.isNotBlank()) appendLine("\n${roleplay.contextText}")
+            appendLine()
+            append(roleplay.rulesText)
+        } else buildString {
             appendLine(RolePromptProvider.getIdentityLine(name, role))
             if (personality.isNotBlank()) {
                 appendLine("性格：$personality")

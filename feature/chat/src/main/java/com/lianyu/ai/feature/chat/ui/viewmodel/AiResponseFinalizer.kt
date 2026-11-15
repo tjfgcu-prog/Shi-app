@@ -172,7 +172,10 @@ class AiResponseFinalizer(
                                         if (settings.storyModeEnabled) {
                         memoryProvider.recordStoryTurn(companionId, companionName, userContentForMemory, aiContent)
                                         }
-                    memoryProvider.extractAndSaveFromConversation(userContentForMemory, aiContent, companionId, groupId = null)
+                    // 角色扮演模式下对话是剧情，不是现实信息：不做"我叫/我喜欢"这类规则提取，避免把剧情里的话当成真人资料
+                    if (!settings.roleplayMode) {
+                        memoryProvider.extractAndSaveFromConversation(userContentForMemory, aiContent, companionId, groupId = null)
+                    }
                 }
             }.onFailure {
                 SecureLog.e("ChatViewModel", "Memory save failed: ${it.message}")
