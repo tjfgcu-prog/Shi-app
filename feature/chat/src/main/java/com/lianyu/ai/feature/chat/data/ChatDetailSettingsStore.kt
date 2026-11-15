@@ -30,6 +30,10 @@ data class CompanionChatDetailSettings(
     val storyModeEnabled: Boolean = false, // 剧情模式：开=记录每轮并每5轮生成摘要；关=日常模式
     val voiceSid: Int = -1, // 本角色的本地语音音色编号；-1 = 使用全局设置
     val voiceSpeed: Float = 0f, // 本角色的语速；0 = 使用全局设置
+    val roleplayMode: Boolean = false, // 角色扮演模式：开=不用"恋爱陪伴"的身份和回复规则，改用角色扮演规则 + 世界书
+    val romanceRatio: Int = 5, // 恋爱 ↔ 剧情：0 = 纯剧情，10 = 纯恋爱，5 = 各占一半
+    val replyLength: Int = 1, // 回复长度档位：0 简短(40-80字) 1 标准(80-150字) 2 长篇(150-300字)
+    val stateCard: String = "", // 状态卡：境界、所在地、持有物、关系、目标、感情进度（用户可手改）
     val updatedAt: Long = System.currentTimeMillis()
 )
 
