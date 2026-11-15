@@ -97,7 +97,6 @@ object CrispAsrTtsEngine {
     @Volatile private var nativeLogFile: File? = null
     @Volatile private var backendName: String? = null
     @Volatile private var loadNotes: String = ""
-    @Volatile private var lastSynthLog: String = ""
 
     fun isLoaded(): Boolean = session != null
 
@@ -263,8 +262,11 @@ object CrispAsrTtsEngine {
             _state.update { it.copy(loading = true, loaded = false, error = null) }
             var opened: Pointer? = null   // 已打开但还没交给 session 的会话；中途任何一步失败都要关掉，避免泄漏几 GB 内存
             try {
-                // 临时诊断：让 CrispASR 打印各阶段耗时等信息（stderr 已重定向到日志文件，试听结果里会显示）。排查完速度问题后删掉这一行
-                runCatching { android.system.Os.setenv("CRISPASR_VERBOSE", "1", true) }
+                // 参考录音编码结果缓存：CrispASR 文档说同一段参考录音再次合成时可以跳过编码，用这个环境变量指定缓存目录（Breeze 后端是否接入了这个缓存，需要实测）
+                runCatching {
+                    val dir = File(app.cacheDir, "crispasr-ref").apply { mkdirs() }
+                    android.system.Os.setenv("CRISPASR_TTS_REF_CACHE_DIR", dir.absolutePath, true)
+                }
                 installNativeLogCapture(app)
                 val loadLogStart = nativeLogFile?.length() ?: 0L
                 val lib = nativeApi()
@@ -518,7 +520,6 @@ object CrispAsrTtsEngine {
         trimNativeLog()
         val logStart = nativeLogFile?.length() ?: 0L
         val ptr = lib.crispasr_session_synthesize(s, text, count)
-        lastSynthLog = nativeLogTail(logStart, 2500)
         if (ptr == null || count.value <= 0) {
             if (ptr != null) runCatching { lib.crispasr_pcm_free(ptr) }
             val detail = try {
@@ -556,12 +557,6 @@ object CrispAsrTtsEngine {
         }.onFailure { SecureLog.w(TAG, "无法捕获原生日志：${it.message}") }
     }
 
-    /** 排查用：加载阶段信息 + 最近一次合成的原生日志（试听结果里显示） */
-    fun diagnostics(): String = buildString {
-        if (loadNotes.isNotBlank()) append("加载信息：").append(loadNotes)
-        if (lastSynthLog.isNotBlank()) append("\n本次合成日志：").append(lastSynthLog)
-    }.take(3000)
-
     /** 原生日志每次合成都会追加几行，超过 1MB 就清空，避免缓存目录里越积越大 */
     private fun trimNativeLog() {
         val f = nativeLogFile ?: return
@@ -570,11 +565,11 @@ object CrispAsrTtsEngine {
         }
     }
 
-    private fun nativeLogTail(fromOffset: Long, maxChars: Long = 1500L): String {
+    private fun nativeLogTail(fromOffset: Long): String {
         val f = nativeLogFile ?: return ""
         return runCatching {
             val len = f.length()
-            val start = maxOf(fromOffset, len - maxChars).coerceAtLeast(0L)
+            val start = maxOf(fromOffset, len - 1500L).coerceAtLeast(0L)
             if (len <= start) return@runCatching ""
             java.io.RandomAccessFile(f, "r").use { raf ->
                 raf.seek(start)
