@@ -73,9 +73,18 @@ fun ChatDetailScreen(
     onNavigateBack: () -> Unit,
     // 传入聊天页的 ViewModelStoreOwner 即可复用同一个 ChatViewModel，
     // 避免打开详情页时再整套创建一遍（Room 监听、消息消费协程、用户资料等）
-    chatViewModelStoreOwner: androidx.lifecycle.ViewModelStoreOwner? = null
+    chatViewModelStoreOwner: androidx.lifecycle.ViewModelStoreOwner? = null,
+    // 打开世界书管理页
+    onOpenWorldBook: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    // 世界书条目（用于显示条数）；首次进入时从文件加载
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            com.lianyu.ai.feature.chat.roleplay.WorldBookStore.init(context)
+        }
+    }
+    val worldBook by com.lianyu.ai.feature.chat.roleplay.WorldBookStore.entries.collectAsState()
     val store = remember { ChatDetailSettingsStore(context) }
     val scope = rememberCoroutineScope()
     val viewModel: ChatViewModel = viewModel(
@@ -313,6 +322,25 @@ fun ChatDetailScreen(
                             store.updateSettings(companionId) { it.copy(stickerProbability = (value * 100).toInt()) }
                         }
                     }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // 角色扮演（洪荒这类世界观）
+            SectionTitle("角色扮演")
+            SettingsCard {
+                RoleplaySettings(
+                    enabled = settings.roleplayMode,
+                    ratio = settings.romanceRatio,
+                    lengthLevel = settings.replyLength,
+                    stateCard = settings.stateCard,
+                    worldBookCount = worldBook.count { it.companionId == 0L || it.companionId == companionId },
+                    onEnabledChange = { v -> scope.launch { store.updateSettings(companionId) { it.copy(roleplayMode = v) } } },
+                    onRatioChange = { v -> scope.launch { store.updateSettings(companionId) { it.copy(romanceRatio = v) } } },
+                    onLengthChange = { v -> scope.launch { store.updateSettings(companionId) { it.copy(replyLength = v) } } },
+                    onStateCardChange = { v -> scope.launch { store.updateSettings(companionId) { it.copy(stateCard = v) } } },
+                    onOpenWorldBook = onOpenWorldBook
                 )
             }
 
@@ -727,4 +755,109 @@ private fun CompanionVoiceSettings(
             )
         }) { Text("试听") }
     }
+}
+
+/** 角色扮演设置：模式开关、恋爱↔剧情滑块、回复长度、状态卡、世界书入口。 */
+@Composable
+private fun RoleplaySettings(
+    enabled: Boolean,
+    ratio: Int,
+    lengthLevel: Int,
+    stateCard: String,
+    worldBookCount: Int,
+    onEnabledChange: (Boolean) -> Unit,
+    onRatioChange: (Int) -> Unit,
+    onLengthChange: (Int) -> Unit,
+    onStateCardChange: (String) -> Unit,
+    onOpenWorldBook: () -> Unit
+) {
+    SettingsToggleRow(
+        title = "角色扮演模式",
+        subtitle = if (enabled) "已开启：不再使用「女友/男友」身份和撒娇回复规则" else "开启后改用角色扮演规则 + 世界书（适合洪荒这类世界观）",
+        checked = enabled,
+        onCheckedChange = onEnabledChange
+    )
+    if (!enabled) return
+
+    var draftRatio by remember(ratio) { mutableStateOf(ratio.toFloat()) }
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        Text(
+            text = "剧情 ← ${draftRatio.toInt()} → 恋爱：${com.lianyu.ai.feature.chat.roleplay.RoleplayPromptBuilder.ratioLabel(draftRatio.toInt())}",
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        androidx.compose.material3.Slider(
+            value = draftRatio,
+            onValueChange = { draftRatio = it },
+            onValueChangeFinished = { onRatioChange(draftRatio.toInt().coerceIn(0, 10)) },
+            valueRange = 0f..10f,
+            steps = 9,
+            modifier = Modifier.fillMaxWidth(),
+            colors = androidx.compose.material3.SliderDefaults.colors(
+                thumbColor = MaterialTheme.colorScheme.primary,
+                activeTrackColor = MaterialTheme.colorScheme.primary,
+                inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        )
+    }
+
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+        Text(
+            text = "回复长度（本地模型生成很慢，字数越多等得越久）",
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            listOf("简短 40-80" to 0, "标准 80-150" to 1, "长篇 150-300" to 2).forEach { (label, level) ->
+                val selected = lengthLevel == level
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
+                        .clickable { onLengthChange(level) }
+                        .padding(vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = label,
+                        fontSize = 12.sp,
+                        color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+
+    var draftCard by remember(stateCard) { mutableStateOf(stateCard) }
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Text(
+            text = "状态卡（境界、所在地、持有物、关系、目标、感情进度；每轮都会带给 AI，可随时手改）",
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        androidx.compose.material3.OutlinedTextField(
+            value = draftCard,
+            onValueChange = { draftCard = it },
+            minLines = 3,
+            maxLines = 8,
+            modifier = Modifier.fillMaxWidth().padding(top = 6.dp)
+        )
+        Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+            TextButton(onClick = {
+                draftCard = "境界：\n所在地：\n持有：\n同行关系：\n当前目标：\n感情进度："
+            }) { Text("填入模板") }
+            TextButton(
+                enabled = draftCard != stateCard,
+                onClick = { onStateCardChange(draftCard) }
+            ) { Text("保存") }
+        }
+    }
+
+    SettingsRow(
+        title = "世界书",
+        subtitle = "共 $worldBookCount 条，点击管理（含洪荒起始条目）",
+        onClick = onOpenWorldBook
+    )
 }
