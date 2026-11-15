@@ -295,8 +295,12 @@ object AiPromptBuilder {
         internal fun buildSystemPrompt(companion: CompanionModel, memoryContext: String = "", lastUserMessage: String = "", availableStickers: List<String> = emptyList(), stickerProbability: Int = 30, innerThoughtEnabled: Boolean = false, ntpTimeEnabled: Boolean = false, role: CompanionRole = CompanionRole.GIRLFRIEND, storyContext: String = "", userProfileText: String = ""): String {
         val persona = extractPersona(companion)
 
+        // 角色扮演模式：身份行和回复规则由 RoleplayProvider 提供，不再用"恋爱陪伴"那一套
+        val roleplay = com.lianyu.ai.domain.ServiceRegistry.get(com.lianyu.ai.domain.RoleplayProvider::class.java)
+            ?.getPrompt(companion.id, companion.name, lastUserMessage)
+
         val metaDirective = buildString {
-            appendLine(RolePromptProvider.getIdentityLine(companion.name, role))
+            appendLine(roleplay?.identityLine ?: RolePromptProvider.getIdentityLine(companion.name, role))
             appendLine("重要：直接回复内容，不要输出思考过程、分析、内心独白或任何元信息。禁止输出<LM_THINK>标签或类似内容。")
         }
 
@@ -325,7 +329,11 @@ object AiPromptBuilder {
         val userProfileSection = if (userProfileText.isNotBlank()) "\n\n$userProfileText\n" else ""
         val timeSection = "\n\n${AiContextTools.buildCurrentTimeContext(ntpTimeEnabled)}\n"
 
-                return basePrompt + userProfileSection + memorySection + storySection + timeSection + "\n" + buildPersonaRules(persona, companion.speakingStyle, availableStickers, stickerProbability, innerThoughtEnabled, role)
+                if (roleplay != null) {
+            val worldSection = if (roleplay.contextText.isNotBlank()) "\n\n${roleplay.contextText}\n" else ""
+            return basePrompt + userProfileSection + memorySection + storySection + worldSection + timeSection + "\n" + roleplay.rulesText
+        }
+        return basePrompt + userProfileSection + memorySection + storySection + timeSection + "\n" + buildPersonaRules(persona, companion.speakingStyle, availableStickers, stickerProbability, innerThoughtEnabled, role)
     }
 
     // === private fun extractPersona(companion: CompanionModel): String { ===
