@@ -2,7 +2,7 @@ package com.lianyu.ai.feature.groupchat
 
 import android.app.Application
 
-import android.util.Log
+import com.lianyu.ai.common.SecureLog as Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
