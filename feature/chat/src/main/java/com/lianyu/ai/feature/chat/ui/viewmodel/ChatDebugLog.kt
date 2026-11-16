@@ -1,31 +1,14 @@
 package com.lianyu.ai.feature.chat.ui.viewmodel
 
-import com.lianyu.ai.feature.chat.BuildConfig
-import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import com.lianyu.ai.common.AppLog
 
 /**
- * Zero-dependency debug log to file — bypasses vivo logcat filtering.
+ * 聊天流程的诊断日志，统一汇入 [AppLog]（设置 → 实时日志）。
  *
- * 🔒 SecurityConstants.Level.MEDIUM: All output guarded by BuildConfig.DEBUG.
- *    In release builds, R8 inlines the constant and dead-code-eliminates
- *    the entire method body. No log file is created on user devices.
+ * 🔒 只有 debug 包会记录：这些日志里带有聊天内容片段，release 包不记录。
  */
 object ChatDebugLog {
-    private val file by lazy {
-        if (!BuildConfig.DEBUG) return@lazy null
-        File("/data/data/com.lianyu.ai.zzz/files/chatvm_debug.log")
-    }
-
     fun log(msg: String) {
-        if (!BuildConfig.DEBUG) return
-        try {
-            val currentFile = file ?: return
-            currentFile.parentFile?.mkdirs()
-            val ts = SimpleDateFormat("HH:mm:ss.SSS", Locale.US).format(Date())
-            currentFile.appendText("$ts $msg\n")
-        } catch (_: Exception) {}
+        AppLog.d("Chat", msg)
     }
 }
