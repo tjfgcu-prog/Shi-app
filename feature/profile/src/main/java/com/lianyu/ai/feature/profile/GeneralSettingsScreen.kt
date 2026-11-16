@@ -5,8 +5,10 @@ package com.lianyu.ai.feature.profile
 
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,6 +18,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 
 import androidx.compose.foundation.layout.statusBars
 
@@ -27,11 +35,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 
 import androidx.compose.material.icons.filled.Brush
+import androidx.compose.material.icons.filled.BugReport
 
 
 
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Person
 
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.RecordVoiceOver
@@ -40,6 +50,7 @@ import androidx.compose.material.icons.filled.SaveAlt
 import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Settings
 
+import androidx.compose.material.icons.filled.TheaterComedy
 import androidx.compose.material.icons.filled.Token
 
 import androidx.compose.material3.AlertDialog
@@ -65,16 +76,21 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-
-
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import com.lianyu.ai.common.AppSettingsStore
 import com.lianyu.ai.common.FrameRateManager
+import com.lianyu.ai.database.model.CompanionEntity
 import com.lianyu.ai.uicommon.component.ChatBackgroundPickerDialog
 import com.lianyu.ai.uicommon.component.getChatBackgroundKey
 import com.lianyu.ai.uicommon.component.setChatBackgroundKey
@@ -85,9 +101,10 @@ import kotlinx.coroutines.launch
  * 总设置页 — 收纳全部次要设置项，按功能领域分组。
  *
  *   0. 自己设定    — 我的信息、各角色专属设定
- *   1. 记忆与管理  — 记忆管理、上下文记忆
+ *   1. 记忆与管理  — 记忆管理、上下文记忆，下面同一个框里是各角色头像（点头像设置该角色的角色扮演）
  *   2. AI 与互动  — API 设置、语音、病娇模式
- *   3. 外观与数据  — 主题模式、聊天背景、帧率、思考设置、Token 统计、数据备份
+ *   3. 实时日志    — 应用所有日志集中在这里
+ *   4. 外观与数据  — 主题模式、聊天背景、帧率、思考设置、Token 统计、数据备份
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -109,9 +126,14 @@ fun GeneralSettingsScreen(
     
     onDataBackupClick: () -> Unit,
     
-    onYandereModeClick: () -> Unit = {}
+    onYandereModeClick: () -> Unit = {},
+    // 点角色头像 → 该角色的角色扮演设置
+    onRoleplayCompanionClick: (Long) -> Unit = {},
+    // 实时日志
+    onLiveLogClick: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    val companions by viewModel<SelfProfileViewModel>().companions.collectAsState()
     val colorScheme = MaterialTheme.colorScheme
     var isVisible by remember { mutableStateOf(true) }
     var showBackgroundDialog by remember { mutableStateOf(false) }
@@ -155,7 +177,10 @@ fun GeneralSettingsScreen(
                     MenuItemData(Icons.Filled.Memory, stringResource(R.string.memory_management), stringResource(R.string.memory_management_desc), onMemoryClick),
                     MenuItemData(Icons.Filled.Memory, stringResource(R.string.context_memory), stringResource(R.string.context_memory_desc), onContextMemoryClick)
                 ),
-                isVisible = isVisible, delayMillis = 20
+                isVisible = isVisible, delayMillis = 20,
+                extraContent = {
+                    RoleplayAvatarBlock(companions = companions, onCompanionClick = onRoleplayCompanionClick)
+                }
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -168,6 +193,16 @@ fun GeneralSettingsScreen(
                     MenuItemData(Icons.Filled.Science, stringResource(R.string.yandere_mode), stringResource(R.string.yandere_mode_desc), onYandereModeClick)
                 ),
                 isVisible = isVisible, delayMillis = 60
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // === 实时日志 ===
+            SolidMenuGroup(
+                items = listOf(
+                    MenuItemData(Icons.Filled.BugReport, "实时日志", "查看应用运行日志：崩溃、本地模型、语音、记忆、网络…", onLiveLogClick)
+                ),
+                isVisible = isVisible, delayMillis = 80
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -196,6 +231,79 @@ fun GeneralSettingsScreen(
             onDismiss = { showBackgroundDialog = false },
             onSelect = { key -> setChatBackgroundKey(context, key); showBackgroundDialog = false }
         )
+    }
+}
+
+// ============================================================================
+// 角色扮演设置：各角色头像一排（放在"记忆管理 / 上下文记忆"同一个框里）
+// ============================================================================
+
+@Composable
+private fun RoleplayAvatarBlock(
+    companions: List<CompanionEntity>,
+    onCompanionClick: (Long) -> Unit
+) {
+    val colorScheme = MaterialTheme.colorScheme
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Filled.TheaterComedy, "角色扮演设置", Modifier.size(24.dp), tint = Color(0xFF07C160))
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "角色扮演设置",
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium, fontSize = 16.sp),
+                    color = colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    if (companions.isEmpty()) "还没有角色" else "点头像，设置该角色的剧情/恋爱比例、回复长度、状态卡和世界书",
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                    color = colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        if (companions.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(10.dp))
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(companions, key = { it.id }) { c ->
+                    Column(
+                        modifier = Modifier
+                            .width(60.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { onCompanionClick(c.id) }
+                            .padding(vertical = 4.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFE5E5E5)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (c.avatarUrl != null) {
+                                AsyncImage(
+                                    model = c.avatarUrl,
+                                    contentDescription = c.name,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                            } else {
+                                Icon(Icons.Filled.Person, c.name, tint = Color(0xFFAAAAAA), modifier = Modifier.size(24.dp))
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            c.name,
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            color = colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
