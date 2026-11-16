@@ -525,7 +525,13 @@ private fun BreezeModeCard(
     // 自定义音色：文字稿 + 同意确认；picker 回调里读到的永远是最新值
     var refText by remember { mutableStateOf("") }
     var consent by remember { mutableStateOf(false) }
-    LaunchedEffect(state.voiceText) { if (refText.isEmpty()) refText = state.voiceText }
+    // 音色保存后整个表单会隐藏；删除音色后表单重新出现时必须是空白，并且要重新勾选同意（同意是针对每一段声音的）
+    LaunchedEffect(state.voiceName) {
+        if (state.voiceName == null) {
+            refText = ""
+            consent = false
+        }
+    }
     val voicePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) CrispAsrTtsEngine.importVoice(context, uri, refText, consent)
     }
@@ -622,36 +628,38 @@ private fun BreezeModeCard(
         HorizontalDivider(color = textSecondaryColor.copy(alpha = 0.15f))
 
         // ── 自定义音色 ──
-        Text("自定义音色（可选）", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = textPrimaryColor)
-        Text(
-            "上传一段已获得本人同意的录音，之后合成就一直用这个音色。" +
-                "要求：WAV 格式，单人说话、干净无噪音，2–30 秒（5–15 秒效果最好），并填写录音的逐字文字稿。",
-            fontSize = 12.sp, color = textSecondaryColor
-        )
-        OutlinedTextField(
-            value = refText,
-            onValueChange = { refText = it },
-            label = { Text("录音的逐字文字稿（必须和录音一致）") },
-            modifier = Modifier.fillMaxWidth(),
-            minLines = 2,
-            enabled = !busy
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth().clickable(enabled = !busy) { consent = !consent },
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Checkbox(checked = consent, onCheckedChange = { consent = it }, enabled = !busy)
+        // 还没有音色：显示上传表单；已经设置好：表单隐藏，只显示当前音色和「删除」，删除后表单重新出现
+        if (state.voiceName == null) {
+            Text("自定义音色（可选）", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = textPrimaryColor)
             Text(
-                "我确认这段声音是我自己的，或其所有者已明确同意用于语音合成",
-                fontSize = 12.sp, color = textPrimaryColor, modifier = Modifier.weight(1f)
+                "上传一段已获得本人同意的录音，之后合成就一直用这个音色。" +
+                    "要求：WAV 格式，单人说话、干净无噪音，2–30 秒（5–15 秒效果最好），并填写录音的逐字文字稿。",
+                fontSize = 12.sp, color = textSecondaryColor
             )
-        }
-        OutlinedButton(
-            onClick = { voicePicker.launch(arrayOf("*/*")) },
-            enabled = !busy && consent && refText.isNotBlank(),
-            modifier = Modifier.fillMaxWidth().height(42.dp), shape = RoundedCornerShape(14.dp)
-        ) { Text(if (state.voiceName == null) "选择参考录音（WAV）并保存" else "更换参考录音（WAV）", fontSize = 13.sp) }
-        if (state.voiceName != null) {
+            OutlinedTextField(
+                value = refText,
+                onValueChange = { refText = it },
+                label = { Text("录音的逐字文字稿（必须和录音一致）") },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 2,
+                enabled = !busy
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth().clickable(enabled = !busy) { consent = !consent },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Checkbox(checked = consent, onCheckedChange = { consent = it }, enabled = !busy)
+                Text(
+                    "我确认这段声音是我自己的，或其所有者已明确同意用于语音合成",
+                    fontSize = 12.sp, color = textPrimaryColor, modifier = Modifier.weight(1f)
+                )
+            }
+            OutlinedButton(
+                onClick = { voicePicker.launch(arrayOf("*/*")) },
+                enabled = !busy && consent && refText.isNotBlank(),
+                modifier = Modifier.fillMaxWidth().height(42.dp), shape = RoundedCornerShape(14.dp)
+            ) { Text("选择参考录音（WAV）并保存", fontSize = 13.sp) }
+        } else {
             Text(
                 "当前音色：${state.voiceName}（${"%.1f".format(state.voiceSeconds)} 秒）" +
                     if (state.loaded && state.voiceActive) " · 使用中" else " · 加载模型后生效",
