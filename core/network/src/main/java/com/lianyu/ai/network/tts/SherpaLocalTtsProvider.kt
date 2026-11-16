@@ -5,7 +5,7 @@ import com.k2fsa.sherpa.onnx.OfflineTts
 import com.k2fsa.sherpa.onnx.OfflineTtsConfig
 import com.k2fsa.sherpa.onnx.OfflineTtsModelConfig
 import com.k2fsa.sherpa.onnx.OfflineTtsVitsModelConfig
-import android.content.pm.ApplicationInfo
+import com.lianyu.ai.common.AppLog
 import com.lianyu.ai.common.PerfPrefs
 import com.lianyu.ai.common.SecureLog
 import com.lianyu.ai.common.VoiceWaveform
@@ -14,10 +14,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 /**
  * 本地离线 TTS Provider - 基于 sherpa-onnx [OfflineTts]。
@@ -149,13 +145,9 @@ class SherpaLocalTtsProvider : TtsProviderInterface, ConfigurableTtsProvider {
         }
     }
 
-    /** 仅 debug 包写诊断日志（release 不落盘，且不记录文本内容） */
-    private fun diag(context: Context, message: String) {
-        if ((context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) == 0) return
-        runCatching {
-            val time = SimpleDateFormat("HH:mm:ss.SSS", Locale.US).format(Date())
-            File(context.filesDir, "chatvm_debug.log").appendText("$time [TTS] $message\n")
-        }
+    /** 诊断日志汇入 AppLog（设置 → 实时日志）；仅 debug 包记录（release 不落盘，且不记录文本内容） */
+    private fun diag(@Suppress("UNUSED_PARAMETER") context: Context, message: String) {
+        AppLog.d("TTS", message)
     }
 
     /**
