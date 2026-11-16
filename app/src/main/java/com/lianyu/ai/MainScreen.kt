@@ -74,7 +74,8 @@ import kotlinx.coroutines.launch
  * 路由: Home, Contacts, Profile, Chat(id), ChatDetail(id),
  *       GroupChat(id), GroupDetail(id), CreateGroup, CreateCompanion, EditCompanion(id),
  *       Settings, TtsSettings, TokenUsage, Theme, FrameRate, YandereMode,
- *       GeneralSettings, Memory, ContextMemory, SelfProfile, CompanionSelfProfile(id), DataBackup
+ *       GeneralSettings, Memory, ContextMemory, SelfProfile, CompanionSelfProfile(id), DataBackup,
+ *       RoleplaySettings(id), LiveLog
  *   差分方程: S[k+1] = f(S[k], E[k])
  *   验证: 所有状态出度 ≥ 1 (popBackStack 保证)
  */
@@ -258,8 +259,15 @@ fun MainScreen(mainActivity: Activity) {
                     ChatDetailScreen(
                         companionId = detailCompanionId,
                         onNavigateBack = { navController.popBackStack() },
-                        chatViewModelStoreOwner = chatEntry,
-                        onOpenWorldBook = { navController.navigate(MainRoute.WorldBook(detailCompanionId).route) }
+                        chatViewModelStoreOwner = chatEntry
+                    )
+                }
+                composable(MainRoute.RoleplaySettings(0).route.replace("0", "{companionId}"), arguments = listOf(navArgument("companionId") { type = NavType.LongType })) { backStackEntry ->
+                    val roleplayCompanionId = backStackEntry.arguments?.getLong("companionId") ?: 0L
+                    com.lianyu.ai.feature.chat.ui.screen.RoleplaySettingsScreen(
+                        companionId = roleplayCompanionId,
+                        onNavigateBack = { navController.popBackStack() },
+                        onOpenWorldBook = { navController.navigate(MainRoute.WorldBook(roleplayCompanionId).route) }
                     )
                 }
                 composable(MainRoute.WorldBook(0).route.replace("0", "{companionId}"), arguments = listOf(navArgument("companionId") { type = NavType.LongType })) { backStackEntry ->
@@ -286,6 +294,7 @@ fun MainScreen(mainActivity: Activity) {
                 composable(MainRoute.Settings.route) { SettingsScreen(onNavigateBack = { navController.popBackStack() }) }
                 composable(MainRoute.TtsSettings.route) { TtsSettingsScreen(onNavigateBack = { navController.popBackStack() }, isDarkTheme = isDark) }
                 composable(MainRoute.TokenUsage.route) { TokenUsageScreen(onNavigateBack = { navController.popBackStack() }) }
+                composable(MainRoute.LiveLog.route) { com.lianyu.ai.feature.settings.ui.screen.LiveLogScreen(onNavigateBack = { navController.popBackStack() }) }
                 composable(MainRoute.Memory.route) { MemoryScreen(onNavigateBack = { navController.popBackStack() }) }
                 composable(MainRoute.Theme.route) { ThemeScreen(onNavigateBack = { navController.popBackStack() }, activity = mainActivity) }
                 composable(MainRoute.FrameRate.route) { FrameRateScreen(onNavigateBack = { navController.popBackStack() }, activity = mainActivity) }
@@ -325,7 +334,10 @@ fun MainScreen(mainActivity: Activity) {
                         
                         onDataBackupClick = { navController.navigate(MainRoute.DataBackup.route) },
                         
-                        onYandereModeClick = { navController.navigate(MainRoute.YandereMode.route) }
+                        onYandereModeClick = { navController.navigate(MainRoute.YandereMode.route) },
+                        // 角色扮演设置（点角色头像）/ 实时日志
+                        onRoleplayCompanionClick = { id -> navController.navigate(MainRoute.RoleplaySettings(id).route) },
+                        onLiveLogClick = { navController.navigate(MainRoute.LiveLog.route) }
                     )
                 }
                 
