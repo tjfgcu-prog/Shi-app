@@ -15,6 +15,7 @@ sealed class MainRoute(val route: String) {
     data class Chat(val companionId: Long) : MainRoute("chat/$companionId")
     data class ChatDetail(val companionId: Long) : MainRoute("chat_detail/$companionId")
     data class WorldBook(val companionId: Long) : MainRoute("world_book/$companionId")
+    data class RoleplaySettings(val companionId: Long) : MainRoute("roleplay_settings/$companionId")
     
 
     // === 群聊 ===
@@ -34,6 +35,7 @@ sealed class MainRoute(val route: String) {
     
     object FrameRate : MainRoute("frame_rate")
     object YandereMode : MainRoute("yandere_mode")
+    object LiveLog : MainRoute("live_log")
     
 
     // === 总设置 ===
