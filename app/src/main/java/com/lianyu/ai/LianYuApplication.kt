@@ -3,6 +3,7 @@ package com.lianyu.ai
 import android.app.Application
 import android.content.res.Configuration
 
+import com.lianyu.ai.common.AppLog
 import com.lianyu.ai.common.SecureLog
 import com.lianyu.ai.database.AppDatabase
 import com.lianyu.ai.database.DefaultCompanionSeeder
@@ -60,11 +61,13 @@ class LianYuApplication : Application(), ImageLoaderFactory, androidx.work.Confi
         java.security.Security.setProperty("networkaddress.cache.ttl", "0")
         java.security.Security.setProperty("networkaddress.cache.negative.ttl", "0")
         super.onCreate()
+        // 实时日志必须最先初始化：之后的崩溃记录、退出原因、各模块日志都写进它
+        AppLog.init(this)
         installCrashRecorder()
         instance = this
         // 新进程启动 = 本地模型一定不在内存里：把开关复位为关，保证开关等于"模型是否真的在运行"
         getSharedPreferences("gguf_model_prefs", MODE_PRIVATE).edit().putBoolean("gguf_enabled", false).apply()
-        // 诊断日志写文件，放到后台线程，不拖慢冷启动
+        // 读上次退出原因放到后台线程，不拖慢冷启动
         bgScope.launch { logPreviousExitReasons() }
         initBusiness(this)
         // 冷启动清空媒体解密临时缓存，避免明文副本无限堆积（源文件一直是加密的，清空不丢数据）
@@ -74,7 +77,7 @@ class LianYuApplication : Application(), ImageLoaderFactory, androidx.work.Confi
     }
 
     /**
-     * [诊断] 记录未捕获的 Java/Kotlin 异常：写进 files/chatvm_debug.log，以 [CRASH] 开头。
+     * [诊断] 记录未捕获的 Java/Kotlin 异常：写进实时日志（AppLog），标签 CRASH。
      * 只记异常类型 + 栈帧（类名/方法/行号），不记异常文字描述（可能带聊天内容）。
      * 记完后原样交还给系统默认处理，App 的闪退行为不变。
      * release 包的类名是压缩过的，需配合 CI 上传的 mapping.txt 还原。
@@ -84,9 +87,7 @@ class LianYuApplication : Application(), ImageLoaderFactory, androidx.work.Confi
         Thread.setDefaultUncaughtExceptionHandler { thread, error ->
             runCatching {
                 val sb = StringBuilder()
-                val fmt = java.text.SimpleDateFormat("MM-dd HH:mm:ss", Locale.US)
-                sb.append(fmt.format(java.util.Date())).append(" [CRASH] thread=").append(thread.name)
-                    .append(" ").append(error.javaClass.name).append('\n')
+                sb.append("thread=").append(thread.name).append(' ').append(error.javaClass.name).append('\n')
                 var cur: Throwable? = error
                 var depth = 0
                 while (cur != null && depth < 3) {
@@ -98,33 +99,56 @@ class LianYuApplication : Application(), ImageLoaderFactory, androidx.work.Confi
                     cur = cur.cause
                     depth++
                 }
-                val logFile = java.io.File(filesDir, "chatvm_debug.log")
-                if (logFile.exists() && logFile.length() > 2L * 1024 * 1024) logFile.delete()
-                logFile.appendText(sb.toString())
+                // fatal 会等日志真正写进文件再返回，进程随后被系统杀掉也不会丢
+                AppLog.fatal("CRASH", sb.toString().trimEnd())
             }
             previous?.uncaughtException(thread, error)
         }
     }
 
     /**
-     * [诊断] 把"上一个进程为什么没了"写进 files/chatvm_debug.log（仅 Android 11+）。
-     * REASON_LOW_MEMORY / REASON_SIGNALED(9) = 被系统因内存杀掉；
-     * REASON_CRASH_NATIVE = so 库（llama/sherpa）崩溃；REASON_CRASH = Java 异常。
+     * [诊断] 把"上一个进程为什么没了"写进实时日志（仅 Android 11+），标签 ExitInfo。
+     * 每条退出记录只写一次（记住已经写过的最新时间），不会每次启动都重复。
+     * EXCESSIVE_RESOURCE_USAGE / LOW_MEMORY = 被系统因内存杀掉；
+     * CRASH_NATIVE = so 库（llama/sherpa）崩溃；CRASH = Java 异常。
      */
     private fun logPreviousExitReasons() {
         if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.R) return
         runCatching {
             val am = getSystemService(android.app.ActivityManager::class.java)
+            val prefs = getSharedPreferences("diag_prefs", MODE_PRIVATE)
+            val lastLogged = prefs.getLong("last_exit_logged", 0L)
             val fmt = java.text.SimpleDateFormat("MM-dd HH:mm:ss", Locale.US)
-            val lines = am.getHistoricalProcessExitReasons(packageName, 0, 5).joinToString("\n") { r ->
-                "${fmt.format(java.util.Date(r.timestamp))} [ExitInfo] reason=${r.reason} " +
-                    "status=${r.status} importance=${r.importance} pss=${r.pss / 1024}MB rss=${r.rss / 1024}MB desc=${r.description}"
+            val fresh = am.getHistoricalProcessExitReasons(packageName, 0, 5)
+                .filter { it.timestamp > lastLogged }
+                .sortedBy { it.timestamp }
+            fresh.forEach { r ->
+                AppLog.diag(
+                    "ExitInfo",
+                    "上个进程 ${fmt.format(java.util.Date(r.timestamp))} 退出：${exitReasonName(r.reason)}(${r.reason}) " +
+                        "status=${r.status} importance=${r.importance} pss=${r.pss / 1024}MB rss=${r.rss / 1024}MB desc=${r.description}"
+                )
             }
-            val logFile = java.io.File(filesDir, "chatvm_debug.log")
-            // 调试日志只追加不清理会越来越大：超过 2MB 就从头记
-            if (logFile.exists() && logFile.length() > 2L * 1024 * 1024) logFile.delete()
-            logFile.appendText("$lines\n")
+            fresh.maxOfOrNull { it.timestamp }?.let { prefs.edit().putLong("last_exit_logged", it).apply() }
         }
+    }
+
+    /** ApplicationExitInfo.REASON_* 的数值 → 名字（直接用数值，免得在低版本系统上引用 API 30 的类） */
+    private fun exitReasonName(reason: Int): String = when (reason) {
+        1 -> "EXIT_SELF"
+        2 -> "SIGNALED"
+        3 -> "LOW_MEMORY"
+        4 -> "CRASH"
+        5 -> "CRASH_NATIVE"
+        6 -> "ANR"
+        7 -> "INITIALIZATION_FAILURE"
+        8 -> "PERMISSION_CHANGE"
+        9 -> "EXCESSIVE_RESOURCE_USAGE"
+        10 -> "USER_REQUESTED"
+        11 -> "USER_STOPPED"
+        12 -> "DEPENDENCY_DIED"
+        13 -> "OTHER"
+        else -> "UNKNOWN"
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
