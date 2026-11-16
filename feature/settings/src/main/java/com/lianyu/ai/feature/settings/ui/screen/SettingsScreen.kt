@@ -728,9 +728,6 @@ private fun GgufLocalModelSection(
                 slideInVertically(tween(400, delayMillis = 260)) { it / 4 }
     ) {
         Column {
-        var showLogDialog by remember { mutableStateOf(false) }
-        var logContent by remember { mutableStateOf("") }
-
         // 卡片1：模型信息 + 选择文件
         Column(
             modifier = Modifier
@@ -1035,65 +1032,6 @@ private fun GgufLocalModelSection(
         }
 
         Spacer(modifier = Modifier.height(12.dp))
-
-        // 卡片3：查看调试日志
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp)
-                .clip(RoundedCornerShape(20.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .padding(20.dp)
-        ) {
-            Button(
-                onClick = {
-                    val logFile = java.io.File("/data/data/com.lianyu.ai.zzz/files/chatvm_debug.log")
-                    logContent = if (logFile.exists()) {
-                        logFile.readText().takeLast(4000)
-                    } else {
-                        "日志文件不存在（可能还没触发过任何日志记录）"
-                    }
-                    showLogDialog = true
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("查看调试日志")
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Button(
-                onClick = {
-                    val logFile = java.io.File("/data/data/com.lianyu.ai.zzz/files/chatvm_debug.log")
-                    val deleted = if (logFile.exists()) logFile.delete() else true
-                    android.widget.Toast.makeText(
-                        context,
-                        if (deleted) "日志已清空" else "清空失败",
-                        android.widget.Toast.LENGTH_SHORT
-                    ).show()
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("清空日志")
-            }
-        }
-
-            if (showLogDialog) {
-                AlertDialog(
-                    onDismissRequest = { showLogDialog = false },
-                    confirmButton = {
-                        Button(onClick = { showLogDialog = false }) { Text("关闭") }
-                    },
-                    title = { Text("调试日志（最近部分）") },
-                    text = {
-                        Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                            androidx.compose.foundation.text.selection.SelectionContainer {
-                                Text(text = logContent, fontSize = 10.sp)
-                            }
-                        }
-                    }
-                )
-            }
         }
     }
 }
