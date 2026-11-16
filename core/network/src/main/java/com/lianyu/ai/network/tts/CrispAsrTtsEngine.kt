@@ -3,6 +3,7 @@ package com.lianyu.ai.network.tts
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
+import com.lianyu.ai.common.AppLog
 import com.lianyu.ai.common.PerfPrefs
 import com.lianyu.ai.common.SecureLog
 import com.sun.jna.Library
@@ -300,7 +301,10 @@ object CrispAsrTtsEngine {
                     append(" 设置返回码=").append(rc)
                     voiceRc?.let { append(" 音色返回码=").append(it) }
                     val l = nativeLogTail(loadLogStart)
-                    if (l.isNotBlank()) append("\n").append(l)
+                    if (l.isNotBlank()) {
+                        append("\n").append(l)
+                        AppLog.diag("CrispASR", "加载 · 原生日志：$l")
+                    }
                 }
                 val backend = runCatching { lib.crispasr_session_backend(s) }.getOrNull()
                 backendName = backend
@@ -535,6 +539,7 @@ object CrispAsrTtsEngine {
             if (loadNotes.isNotBlank()) sb.append("\n加载信息：").append(loadNotes)
             throw IllegalStateException(sb.toString())
         }
+        nativeLogTail(logStart).takeIf { it.isNotBlank() }?.let { AppLog.d("CrispASR", "合成 · 原生日志：$it") }
         try {
             ptr.getFloatArray(0, count.value) to sampleRate
         } finally {
