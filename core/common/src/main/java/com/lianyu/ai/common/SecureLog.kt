@@ -5,7 +5,8 @@ import android.util.Log
 /**
  * SecureLog — 安全日志包装器
  *
- * - isDebug 由 LianYuApplication onCreate 中调用 SecureLog.init(isDebug) 注入
+ * - isDebug 由 LianYuApplication onCreate 中调用 SecureLog.init(isDebug) 注入，只决定是否输出到 logcat
+ * - 所有日志同时汇入 [AppLog]（设置里的「实时日志」页）；AppLog 自己按包类型决定记录哪些级别
  */
 
 object SecureLog {
@@ -31,26 +32,31 @@ object SecureLog {
     @JvmStatic
     fun d(subtag: String, msg: String) {
         if (isDebug) Log.d(TAG, "[$subtag] $msg")
+        AppLog.d(subtag, msg)
     }
 
     @JvmStatic
     fun i(subtag: String, msg: String) {
         if (isDebug) Log.i(TAG, "[$subtag] $msg")
+        AppLog.i(subtag, msg)
     }
 
     @JvmStatic
     fun w(subtag: String, msg: String) {
         if (isDebug) Log.w(TAG, "[$subtag] $msg")
+        AppLog.w(subtag, msg)
     }
 
     @JvmStatic
     fun e(subtag: String, msg: String) {
         if (isDebug) Log.e(TAG, "[$subtag] $msg")
+        AppLog.e(subtag, msg)
     }
 
     @JvmStatic
     fun e(subtag: String, msg: String, tr: Throwable) {
         if (isDebug) Log.e(TAG, "[$subtag] $msg", tr)
+        AppLog.e(subtag, msg, tr)
     }
 
     /**
@@ -64,6 +70,7 @@ object SecureLog {
         // Log.wtf is always visible in logcat, even in release builds
         // But does NOT route to stderr — stays within Android's log buffer
         Log.wtf(TAG, "[CRITICAL] $msg")
+        AppLog.fatal("CRITICAL", msg)
     }
 
     /**
@@ -72,6 +79,7 @@ object SecureLog {
     @JvmStatic
     fun security(msg: String) {
         if (isDebug) Log.d(TAG, "[SEC] $msg")
+        AppLog.d("SEC", msg)
     }
 
     /**
@@ -80,6 +88,7 @@ object SecureLog {
     @JvmStatic
     fun api(subtag: String, msg: String) {
         if (isDebug) Log.d(TAG, "[API][$subtag] $msg")
+        AppLog.d("API", "[$subtag] $msg")
     }
 
     /**
@@ -88,6 +97,7 @@ object SecureLog {
     @JvmStatic
     fun network(subtag: String, msg: String) {
         if (isDebug) Log.d(TAG, "[NET][$subtag] $msg")
+        AppLog.d("NET", "[$subtag] $msg")
     }
 
 
@@ -98,6 +108,7 @@ object SecureLog {
     @JvmStatic
     fun typing(subtag: String, msg: String) {
         if (isDebug) Log.d(TAG, "[TYPING][$subtag] $msg")
+        AppLog.d("TYPING", "[$subtag] $msg")
     }
 
     /**
@@ -106,6 +117,7 @@ object SecureLog {
     @JvmStatic
     fun perf(subtag: String, msg: String) {
         if (isDebug) Log.d(TAG, "[PERF][$subtag] $msg")
+        AppLog.d("PERF", "[$subtag] $msg")
     }
 
     /**
