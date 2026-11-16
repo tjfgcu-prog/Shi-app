@@ -2,7 +2,7 @@ package com.lianyu.ai.feature.localmodel
 
 import android.content.ContentResolver
 import android.net.Uri
-import android.util.Log
+import com.lianyu.ai.common.SecureLog as Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
