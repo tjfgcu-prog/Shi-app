@@ -1,9 +1,9 @@
 package com.lianyu.ai.feature.localmodel
 
 import android.content.Context
+import com.lianyu.ai.common.AppLog
 import com.lianyu.ai.common.PerfPrefs
 import com.lianyu.ai.domain.LocalModelStatus
-import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -29,17 +29,10 @@ class GgufLocalModel(context: Context) {
     private val appContext = context.applicationContext
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
-    // 只在可调试（debug）包里写诊断日志：以前每个 token 都会打开/追加/关闭一次文件，
-    // 而且 release 包里也在写（还把 AI 生成的每个字明文落盘）。
-    private val debuggable =
-        (appContext.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
-
+    // 诊断日志统一汇入 AppLog（设置 → 实时日志）；只有 debug 包记录，release 包不记录
+    // （日志里带有 AI 生成的文字，不能明文落盘）。
     private fun logD(msg: String) {
-        if (!debuggable) return
-        try {
-            val f = File(appContext.filesDir, "chatvm_debug.log")
-            f.appendText("${System.currentTimeMillis()} [GgufLocalModel] $msg\n")
-        } catch (_: Exception) { }
+        AppLog.d("GgufLocalModel", msg)
     }
 
     private val llmFlow = MutableSharedFlow<LlamaHelper.LLMEvent>(
