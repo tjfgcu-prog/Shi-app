@@ -973,16 +973,38 @@ class ChatViewModel(
     private fun sidFromAudioPath(path: String): Int? =
         Regex("_s(\\d+)_").find(java.io.File(path).name)?.groupValues?.get(1)?.toIntOrNull()
 
-    /** 聊天设置页"试听"：用指定音色/语速读一句固定的话并播放（null = 用当前生效的设置） */
+    private val _previewingVoice = MutableStateFlow(false)
+
+    /** 聊天详情页"试听"是否正在合成（合成中按钮置灰，避免连点排起一串 Breeze 合成） */
+    val previewingVoice: StateFlow<Boolean> = _previewingVoice.asStateFlow()
+
+    /**
+     * 聊天详情页"试听"：用指定音色/语速读一句固定的话并播放（null = 用当前生效的设置）。
+     * 同一时间只允许一次试听；Breeze 在手机上合成很慢，开始时先提示，失败时显示 Breeze 自己的失败原因。
+     */
     fun previewVoice(sid: Int?, speed: Float?) {
+        if (!_previewingVoice.compareAndSet(false, true)) return
+        val provider = ttsService.getCurrentProvider()
+        if (provider == com.lianyu.ai.network.tts.TtsProvider.BREEZE) {
+            showToast("正在合成试听…Breeze 在手机上较慢，可能要几十秒，第一次还要先加载模型")
+        }
         applicationApiScope.launch {
-            val result = chatTtsController.synthesizeVoiceReply("你好呀，这是我的声音，你觉得好听吗？", sid, speed)
-            if (result != null) {
-                kotlinx.coroutines.withContext(Dispatchers.Main) {
-                    com.lianyu.ai.uicommon.component.VoicePlayer.toggle(result.first)
+            try {
+                val result = chatTtsController.synthesizeVoiceReply("你好呀，这是我的声音，你觉得好听吗？", sid, speed)
+                if (result != null) {
+                    kotlinx.coroutines.withContext(Dispatchers.Main) {
+                        com.lianyu.ai.uicommon.component.VoicePlayer.toggle(result.first)
+                    }
+                } else {
+                    val reason = if (provider == com.lianyu.ai.network.tts.TtsProvider.BREEZE) {
+                        com.lianyu.ai.network.tts.CrispAsrTtsProvider.lastError
+                    } else {
+                        com.lianyu.ai.network.tts.SherpaLocalTtsProvider.lastError
+                    }
+                    showToast("试听失败：${reason ?: "语音引擎未就绪，或合成超时"}")
                 }
-            } else {
-                showToast("试听失败：${com.lianyu.ai.network.tts.SherpaLocalTtsProvider.lastError ?: "语音引擎未就绪"}")
+            } finally {
+                _previewingVoice.value = false
             }
         }
     }
