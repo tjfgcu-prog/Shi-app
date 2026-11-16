@@ -2,6 +2,7 @@ package com.lianyu.ai.feature.memory.engine
 
 import android.content.Context
 import android.util.Log
+import com.lianyu.ai.common.AppLog
 import com.lianyu.ai.common.DeviceIdProvider
 import com.lianyu.ai.common.UserSelfProfile
 import com.lianyu.ai.database.repository.UserRepository
@@ -102,12 +103,9 @@ class MemoryManager private constructor(
     // 摘要失败后的冷却截止时间
     private val summaryRetryAt = ConcurrentHashMap<Long, Long>()
 
-    // 与 GgufLocalModel.logD 写同一份文件，App 内"日志"页才能看到记忆/剧情的运行情况
+    // 汇入 AppLog，设置 → 实时日志 里能看到记忆/剧情的运行情况（任何包都记录，和以前一样）
     private fun dbg(msg: String) {
-        try {
-            val time = java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.US).format(java.util.Date())
-            java.io.File(context.filesDir, "chatvm_debug.log").appendText("$time [MemoryManager] $msg\n")
-        } catch (_: Exception) { }
+        AppLog.diag("MemoryManager", msg)
     }
 
     private fun logE(msg: String, t: Throwable) {
