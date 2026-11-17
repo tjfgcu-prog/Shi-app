@@ -15,6 +15,7 @@ sealed class MainRoute(val route: String) {
     data class Chat(val companionId: Long) : MainRoute("chat/$companionId")
     data class ChatDetail(val companionId: Long) : MainRoute("chat_detail/$companionId")
     data class WorldBook(val companionId: Long) : MainRoute("world_book/$companionId")
+    object RoleplayCompanions : MainRoute("roleplay_companions")
     data class RoleplaySettings(val companionId: Long) : MainRoute("roleplay_settings/$companionId")
     
 
