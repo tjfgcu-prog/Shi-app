@@ -47,7 +47,6 @@ import androidx.compose.ui.unit.sp
 import com.lianyu.ai.database.repository.CompanionRepository
 import com.lianyu.ai.domain.ServiceRegistry
 import com.lianyu.ai.feature.chat.data.ChatDetailSettingsStore
-import com.lianyu.ai.feature.chat.data.CompanionChatDetailSettings
 import com.lianyu.ai.feature.chat.roleplay.RoleplayPromptBuilder
 import com.lianyu.ai.feature.chat.roleplay.WorldBookStore
 import kotlinx.coroutines.Dispatchers
@@ -69,7 +68,9 @@ fun RoleplaySettingsScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val store = remember { ChatDetailSettingsStore(context) }
-    val settings by store.settingsFlow(companionId).collectAsState(initial = CompanionChatDetailSettings())
+    // 设置读出来之前是 null：这一瞬间什么都不画，避免先闪一下默认值 / "还没有开启"的提示再跳成真实值
+    val loadedSettings by store.settingsFlow(companionId).collectAsState(initial = null)
+    val settings = loadedSettings
 
     var companionName by remember { mutableStateOf("") }
     LaunchedEffect(companionId) {
@@ -108,52 +109,54 @@ fun RoleplaySettingsScreen(
                 )
             }
 
-            if (!settings.roleplayMode) {
-                Text(
-                    text = "这个角色还没有开启「角色扮演模式」。到该角色的聊天详情页打开开关后，下面的设置才会生效。",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-            }
+            if (settings != null) {
+                if (!settings.roleplayMode) {
+                    Text(
+                        text = "这个角色还没有开启「角色扮演模式」。到该角色的聊天详情页打开开关后，下面的设置才会生效。",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.surface)
-            ) {
-                RatioSetting(
-                    ratio = settings.romanceRatio,
-                    onRatioChange = { v -> scope.launch { store.updateSettings(companionId) { it.copy(romanceRatio = v) } } }
-                )
-                LengthSetting(
-                    lengthLevel = settings.replyLength,
-                    onLengthChange = { v -> scope.launch { store.updateSettings(companionId) { it.copy(replyLength = v) } } }
-                )
-                StateCardSetting(
-                    stateCard = settings.stateCard,
-                    onStateCardChange = { v -> scope.launch { store.updateSettings(companionId) { it.copy(stateCard = v) } } }
-                )
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable(onClick = onOpenWorldBook)
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                        .padding(horizontal = 16.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surface)
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(text = "世界书", fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
-                        Text(
-                            text = "共 $worldBookCount 条，点击管理（含洪荒起始条目）",
-                            fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    RatioSetting(
+                        ratio = settings.romanceRatio,
+                        onRatioChange = { v -> scope.launch { store.updateSettings(companionId) { it.copy(romanceRatio = v) } } }
+                    )
+                    LengthSetting(
+                        lengthLevel = settings.replyLength,
+                        onLengthChange = { v -> scope.launch { store.updateSettings(companionId) { it.copy(replyLength = v) } } }
+                    )
+                    StateCardSetting(
+                        stateCard = settings.stateCard,
+                        onStateCardChange = { v -> scope.launch { store.updateSettings(companionId) { it.copy(stateCard = v) } } }
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(onClick = onOpenWorldBook)
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(text = "世界书", fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
+                            Text(
+                                text = "共 $worldBookCount 条，点击管理（含洪荒起始条目）",
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Text(text = "›", fontSize = 18.sp, color = MaterialTheme.colorScheme.outline)
                     }
-                    Text(text = "›", fontSize = 18.sp, color = MaterialTheme.colorScheme.outline)
                 }
             }
 
