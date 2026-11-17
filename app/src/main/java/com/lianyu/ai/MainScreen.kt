@@ -75,7 +75,7 @@ import kotlinx.coroutines.launch
  *       GroupChat(id), GroupDetail(id), CreateGroup, CreateCompanion, EditCompanion(id),
  *       Settings, TtsSettings, TokenUsage, Theme, FrameRate, YandereMode,
  *       GeneralSettings, Memory, ContextMemory, SelfProfile, CompanionSelfProfile(id), DataBackup,
- *       RoleplaySettings(id), LiveLog
+ *       RoleplayCompanions, RoleplaySettings(id), LiveLog
  *   差分方程: S[k+1] = f(S[k], E[k])
  *   验证: 所有状态出度 ≥ 1 (popBackStack 保证)
  */
@@ -262,6 +262,12 @@ fun MainScreen(mainActivity: Activity) {
                         chatViewModelStoreOwner = chatEntry
                     )
                 }
+                composable(MainRoute.RoleplayCompanions.route) {
+                    com.lianyu.ai.feature.profile.RoleplayCompanionListScreen(
+                        onNavigateBack = { navController.popBackStack() },
+                        onCompanionClick = { id -> navController.navigate(MainRoute.RoleplaySettings(id).route) }
+                    )
+                }
                 composable(MainRoute.RoleplaySettings(0).route.replace("0", "{companionId}"), arguments = listOf(navArgument("companionId") { type = NavType.LongType })) { backStackEntry ->
                     val roleplayCompanionId = backStackEntry.arguments?.getLong("companionId") ?: 0L
                     com.lianyu.ai.feature.chat.ui.screen.RoleplaySettingsScreen(
@@ -335,8 +341,8 @@ fun MainScreen(mainActivity: Activity) {
                         onDataBackupClick = { navController.navigate(MainRoute.DataBackup.route) },
                         
                         onYandereModeClick = { navController.navigate(MainRoute.YandereMode.route) },
-                        // 角色扮演设置（点角色头像）/ 实时日志
-                        onRoleplayCompanionClick = { id -> navController.navigate(MainRoute.RoleplaySettings(id).route) },
+                        // 角色扮演设置（进入后选角色头像）/ 实时日志
+                        onRoleplaySettingsClick = { navController.navigate(MainRoute.RoleplayCompanions.route) },
                         onLiveLogClick = { navController.navigate(MainRoute.LiveLog.route) }
                     )
                 }
