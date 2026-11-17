@@ -11,7 +11,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -290,13 +289,7 @@ internal data class MenuItemData(
 )
 
 @Composable
-internal fun SolidMenuGroup(
-    items: List<MenuItemData>,
-    isVisible: Boolean,
-    delayMillis: Int,
-    /** 放在菜单项下面、同一个框里的额外内容（例如角色头像一排） */
-    extraContent: (@Composable ColumnScope.() -> Unit)? = null
-) {
+internal fun SolidMenuGroup(items: List<MenuItemData>, isVisible: Boolean, delayMillis: Int) {
     val colorScheme = MaterialTheme.colorScheme
     AnimatedVisibility(
         visible = isVisible,
@@ -312,9 +305,8 @@ internal fun SolidMenuGroup(
                 .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
             items.forEachIndexed { index, item ->
-                SolidMenuItem(item.icon, item.title, item.subtitle, item.onClick, index < items.size - 1 || extraContent != null, item.emojiIcon)
+                SolidMenuItem(item.icon, item.title, item.subtitle, item.onClick, index < items.size - 1, item.emojiIcon)
             }
-            if (extraContent != null) extraContent(this)
         }
     }
 }
