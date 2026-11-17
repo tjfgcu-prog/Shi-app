@@ -103,14 +103,21 @@ class MemoryManager private constructor(
     // 摘要失败后的冷却截止时间
     private val summaryRetryAt = ConcurrentHashMap<Long, Long>()
 
-    // 汇入 AppLog，设置 → 实时日志 里能看到记忆/剧情的运行情况（任何包都记录，和以前一样）
+    // 汇入 AppLog，设置 → 实时日志 里能看到记忆/剧情的运行情况。
+    // dbg：任何包都记录，只写状态、数量，不能带聊天/摘要内容；
+    // dbgContent：带摘要原文、异常文字等内容的日志，只有 debug 包记录（release 不落盘）。
     private fun dbg(msg: String) {
         AppLog.diag("MemoryManager", msg)
     }
 
+    private fun dbgContent(msg: String) {
+        AppLog.d("MemoryManager", msg)
+    }
+
     private fun logE(msg: String, t: Throwable) {
         Log.e(TAG, msg, t)
-        dbg("ERROR $msg: ${t.javaClass.simpleName}: ${t.message}")
+        dbg("ERROR $msg: ${t.javaClass.simpleName}")
+        dbgContent("ERROR $msg 详情: ${t.message}")
     }
 
     
@@ -849,7 +856,8 @@ class MemoryManager private constructor(
         if (cleaned.length < 20 || badMarker != null) {
             summaryRetryAt[companionId] = System.currentTimeMillis() + STORY_SUMMARY_RETRY_COOLDOWN_MS
             val why = if (cleaned.length < 20) "过短(${cleaned.length}字)" else "含禁用词「$badMarker」"
-            dbg("[剧情摘要] 被拒绝：$why，冷却5分钟。原始输出=${raw.orEmpty().take(300)}")
+            dbg("[剧情摘要] 被拒绝：$why，冷却5分钟")
+            dbgContent("[剧情摘要] 被拒绝的原始输出=${raw.orEmpty().take(300)}")
             return
         }
 
@@ -867,7 +875,8 @@ class MemoryManager private constructor(
                 )
                 storyCache[companionId] = next
                 store.saveStoryState(MemoryScope.COMPANION, companionId, next)
-                dbg("[剧情摘要] 已保存 ${cleaned.length}字，剩余待摘要=${next.pendingTurns.size}轮：$cleaned")
+                dbg("[剧情摘要] 已保存 ${cleaned.length}字，剩余待摘要=${next.pendingTurns.size}轮")
+                dbgContent("[剧情摘要] 摘要内容：$cleaned")
             }
         }
     }
