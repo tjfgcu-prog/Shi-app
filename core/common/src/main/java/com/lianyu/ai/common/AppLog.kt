@@ -3,6 +3,7 @@ package com.lianyu.ai.common
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import java.io.File
+import java.io.OutputStream
 import java.io.RandomAccessFile
 import java.text.SimpleDateFormat
 import java.util.ArrayDeque
@@ -12,6 +13,8 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 /**
  * 应用内「实时日志」的唯一数据源：App 里所有日志都汇到这里，设置里的「实时日志」页只读这里。
@@ -27,8 +30,13 @@ import java.util.concurrent.atomic.AtomicBoolean
  *    只记录 [fatal]（崩溃）、[diag]（诊断：退出原因、记忆摘要状态、模型加载信息等不含聊天内容的信息）
  *    和 logcat 里的警告 / 错误。
  *
- * 存储：内存里保留最近 [MAX_ENTRIES] 条供界面实时显示，同时追加写入 files/app_live.log，
- * 文件超过 2MB 自动只保留最后 512KB；下次启动会把文件里最近的记录读回来，所以重启后还能看到上一次的日志。
+ * 存储：
+ *  - 应用日志：内存里保留最近 [MAX_ENTRIES] 条供界面实时显示，同时追加写入 files/app_live.log，
+ *    文件超过 2MB 自动只保留最后 512KB；下次启动会把文件里最近的记录读回来，所以重启后还能看到上一次的日志。
+ *  - 系统日志（logcat 里和本应用无关的系统噪音，例如厂商系统的 SELinux、渲染、调度日志）：
+ *    单独放在一个只保留最近 [MAX_SYS_ENTRIES] 条的小缓冲里，只在内存、不写文件，界面默认隐藏，
+ *    这样它们不会把应用自己的日志挤掉。
+ *  - 导出：[writeZip] 把界面上当前显示的日志打成 zip，由界面保存到手机的「下载」文件夹。
  */
 object AppLog {
 
@@ -48,11 +56,17 @@ object AppLog {
     }
 
     private const val MAX_ENTRIES = 3000
+    private const val MAX_SYS_ENTRIES = 500
     private const val MAX_MESSAGE_CHARS = 4000
+    private const val MAX_SYS_MESSAGE_CHARS = 600
     private const val MAX_FILE_BYTES = 2L * 1024 * 1024
     private const val KEEP_FILE_BYTES = 512L * 1024
     private const val HISTORY_READ_BYTES = 400L * 1024
     private const val FILE_NAME = "app_live.log"
+
+    /** logcat 里属于本应用自己用到的原生库 / 崩溃相关的标签：按应用日志处理，写文件 */
+    private val RELEVANT_LOGCAT_TAG =
+        Regex("(?i)llama|ggml|sherpa|onnx|crisp|breeze|whisper|AndroidRuntime|^DEBUG$|tombstone")
 
     /** 来自 logcat、但对排查没有帮助的系统噪音标签 */
     private val NOISY_LOGCAT_TAGS = setOf(
@@ -65,6 +79,7 @@ object AppLog {
 
     private val lock = Any()
     private val ring = ArrayDeque<Entry>()
+    private val sysRing = ArrayDeque<Entry>()
     private var nextId = 0L
 
     /** 每新增 / 清空一次 +1，界面据此判断要不要刷新 */
@@ -161,13 +176,34 @@ object AppLog {
         flushBlocking()
     }
 
-    /** 当前内存里全部日志（旧 → 新） */
-    fun snapshot(): List<Entry> = synchronized(lock) { ring.toList() }
+    /** 当前内存里的应用日志（旧 → 新）；[includeSystem] = true 时把系统日志也按时间顺序合并进来 */
+    fun snapshot(includeSystem: Boolean = false): List<Entry> = synchronized(lock) {
+        if (!includeSystem) ring.toList() else (ring + sysRing).sortedBy { it.id }
+    }
+
+    /** 应用日志条数 */
+    fun appCount(): Int = synchronized(lock) { ring.size }
+
+    /** 系统日志条数（默认在界面里隐藏） */
+    fun systemCount(): Int = synchronized(lock) { sysRing.size }
+
+    /**
+     * 把 [entries]（界面上当前显示的日志）打成 zip 写进 [out]，zip 里只有一个 app_log.txt。
+     * 不会关闭 [out]，由调用方关闭。
+     */
+    fun writeZip(out: OutputStream, entries: List<Entry>) {
+        val zip = ZipOutputStream(out)
+        zip.putNextEntry(ZipEntry("app_log.txt"))
+        for (e in entries) zip.write((e.toLine() + "\n").toByteArray(Charsets.UTF_8))
+        zip.closeEntry()
+        zip.finish()
+    }
 
     /** 清空内存和文件 */
     fun clear() {
         synchronized(lock) {
             ring.clear()
+            sysRing.clear()
             version++
         }
         pending.clear()
@@ -185,21 +221,24 @@ object AppLog {
 
     // ───────────────────────── 内部实现 ─────────────────────────
 
-    private fun add(level: Level, tag: String, rawMessage: String) {
-        val msg = if (rawMessage.length > MAX_MESSAGE_CHARS) {
-            rawMessage.take(MAX_MESSAGE_CHARS) + "…（已截断）"
-        } else {
-            rawMessage
-        }
+    private fun add(level: Level, tag: String, rawMessage: String, system: Boolean = false) {
+        val limit = if (system) MAX_SYS_MESSAGE_CHARS else MAX_MESSAGE_CHARS
+        val msg = if (rawMessage.length > limit) rawMessage.take(limit) + "…（已截断）" else rawMessage
         val time = synchronized(timeFormat) { timeFormat.format(Date()) }
         val entry = synchronized(lock) {
             val e = Entry(nextId++, time, level, tag, msg)
-            ring.addLast(e)
-            while (ring.size > MAX_ENTRIES) ring.pollFirst()
+            if (system) {
+                sysRing.addLast(e)
+                while (sysRing.size > MAX_SYS_ENTRIES) sysRing.pollFirst()
+            } else {
+                ring.addLast(e)
+                while (ring.size > MAX_ENTRIES) ring.pollFirst()
+            }
             version++
             e
         }
-        if (logFile != null) {
+        // 系统日志只放内存，不写文件
+        if (!system && logFile != null) {
             pending.add(entry.toLine())
             scheduleFlush()
         }
@@ -331,6 +370,10 @@ object AppLog {
         // debug 包收 INFO 及以上；release 包只收 WARN 及以上（原生库的 INFO 输出里可能带聊天文字）
         val minPriority = if (isVerbose) Level.INFO.priority else Level.WARN.priority
         if (level.priority < minPriority) return
-        add(level, "sys/$tag", m.groupValues[3])
+        if (RELEVANT_LOGCAT_TAG.containsMatchIn(tag)) {
+            add(level, "native/$tag", m.groupValues[3])
+        } else {
+            add(level, "sys/$tag", m.groupValues[3], system = true)
+        }
     }
 }
