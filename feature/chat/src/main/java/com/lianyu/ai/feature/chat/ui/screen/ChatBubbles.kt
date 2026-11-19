@@ -10,7 +10,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -308,15 +307,12 @@ fun ChatBubble(
     val aiBubbleColor = MaterialTheme.colorScheme.surfaceVariant
     val aiBorderColor = MaterialTheme.colorScheme.outline
 
-    val bubbleInteractionSource = remember { MutableInteractionSource() }
     Box {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .then(
                     if (hasLongPressMenu) Modifier.combinedClickable(
-                        interactionSource = bubbleInteractionSource,
-                        indication = null,
                         onClick = {},
                         onLongClick = { showMenu = true }
                     ) else Modifier
