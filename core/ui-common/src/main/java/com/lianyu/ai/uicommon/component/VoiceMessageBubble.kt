@@ -4,7 +4,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -110,8 +109,6 @@ fun VoiceMessageBubble(
         modifier = modifier
             .widthIn(max = 230.dp)
             .combinedClickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
                 onClick = { handleTap() },
                 onLongClick = onLongClick
             )
