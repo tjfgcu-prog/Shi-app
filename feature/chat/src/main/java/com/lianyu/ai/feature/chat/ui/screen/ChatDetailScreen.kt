@@ -91,6 +91,8 @@ fun ChatDetailScreen(
 
     // 当前语音引擎：只有「本地漫剧女声」才有音色编号可选，Breeze/系统/云端都没有
     val ttsProvider = remember { com.lianyu.ai.network.tts.TtsService.getInstance(context).getCurrentProvider() }
+    // 正在用 Breeze 语音回复时，"消息合并"开关自动打开并锁定（整条回复合成一次，比逐句合成快很多）
+    val breezeVoice = remember { viewModel.isBreezeVoiceReply() }
 
     // 当前本地语音模型的最大音色编号（用于音色滑块范围）
     val maxSid by androidx.compose.runtime.produceState(0) {
@@ -296,6 +298,22 @@ fun ChatDetailScreen(
                     checked = innerThoughtEnabled,
                     onCheckedChange = { checked ->
                         scope.launch { appSettingsStore.setInnerThoughtEnabled(companionId, checked) }
+                    }
+                )
+                HorizontalDivider(modifier = Modifier.padding(start = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                SettingsToggleRow(
+                    title = "消息合并",
+                    subtitle = if (breezeVoice) {
+                        "使用 Breeze 语音时自动开启：整条回复合成一次语音，比逐句合成快很多"
+                    } else {
+                        "开启后，AI 的回复不再拆成多个气泡，内容不变，全部放在一个气泡里"
+                    },
+                    checked = settings.mergeMessages || breezeVoice,
+                    enabled = !breezeVoice,
+                    onCheckedChange = { checked ->
+                        scope.launch {
+                            store.updateSettings(companionId) { it.copy(mergeMessages = checked) }
+                        }
                     }
                 )
             }
@@ -540,7 +558,13 @@ private fun SettingsRow(title: String, subtitle: String? = null, onClick: () -> 
 }
 
 @Composable
-private fun SettingsToggleRow(title: String, subtitle: String? = null, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+private fun SettingsToggleRow(
+    title: String,
+    subtitle: String? = null,
+    checked: Boolean,
+    enabled: Boolean = true,
+    onCheckedChange: (Boolean) -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -557,6 +581,7 @@ private fun SettingsToggleRow(title: String, subtitle: String? = null, checked: 
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,
+            enabled = enabled,
             colors = SwitchDefaults.colors(
                 checkedThumbColor = MaterialTheme.colorScheme.primary,
                 checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
