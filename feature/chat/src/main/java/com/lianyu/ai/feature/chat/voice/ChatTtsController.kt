@@ -5,6 +5,7 @@ import android.media.MediaMetadataRetriever
 import com.lianyu.ai.common.SecureLog
 import com.lianyu.ai.network.tts.ChatTtsConfig
 import com.lianyu.ai.network.tts.ChatTtsMode
+import com.lianyu.ai.network.tts.TtsProvider
 import com.lianyu.ai.network.tts.TtsService
 import com.lianyu.ai.network.tts.TtsTextCleaner
 import kotlinx.coroutines.sync.Mutex
@@ -28,6 +29,13 @@ class ChatTtsController(
     fun isVoiceReplyEnabled(): Boolean = configProvider().mode == ChatTtsMode.VOICE_BAR
 
     /**
+     * 是否正在用 Breeze 语音回复（语音回复已开启，且语音引擎是 Breeze）。
+     * Breeze 每次合成都有约 17 秒固定开销，逐句合成太亏，所以这时整条回复合并成一个气泡、只合成一次。
+     */
+    fun isBreezeVoiceReply(): Boolean =
+        isVoiceReplyEnabled() && ttsService.getCurrentProvider() == TtsProvider.BREEZE
+
+    /**
      * 合成一段语音回复。
      * @param sidOverride 指定本地音色编号（如"换个声音重读"）；null = 用角色设置/全局设置
      * @param speedOverride 指定语速；null = 用角色设置/全局设置
@@ -49,7 +57,7 @@ class ChatTtsController(
             // 多段回复会同时排队合成：先串行（超时只从轮到自己时开始算），
             // 并且本地 VITS 在 LLM 同时推理（如剧情摘要）时会很慢，10 秒太短 → 放宽到 60 秒。
             // Breeze（3B 参数）在手机上很慢，而且重启 App 后第一条还要先加载模型，给足时间
-            val timeoutMs = if (ttsService.getCurrentProvider() == com.lianyu.ai.network.tts.TtsProvider.BREEZE) {
+            val timeoutMs = if (ttsService.getCurrentProvider() == TtsProvider.BREEZE) {
                 BREEZE_SYNTH_TIMEOUT_MS
             } else {
                 LOCAL_SYNTH_TIMEOUT_MS
@@ -88,7 +96,4 @@ class ChatTtsController(
         const val LOCAL_SYNTH_TIMEOUT_MS = 60_000L
         const val BREEZE_SYNTH_TIMEOUT_MS = 240_000L
     }
-
-    /** 保留空实现：ChatViewModel 里如果还有旧的 stop() 调用不至于编译报错，可直接删掉调用处 */
-    fun stop() {}
 }
