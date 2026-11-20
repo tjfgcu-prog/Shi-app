@@ -34,6 +34,7 @@ data class CompanionChatDetailSettings(
     val romanceRatio: Int = 5, // 恋爱 ↔ 剧情：0 = 纯剧情，10 = 纯恋爱，5 = 各占一半
     val replyLength: Int = 1, // 回复长度档位：0 简短(40-80字) 1 标准(80-150字) 2 长篇(150-300字)
     val stateCard: String = "", // 状态卡：境界、所在地、持有物、关系、目标、感情进度（用户可手改）
+    val mergeMessages: Boolean = false, // 消息合并：开=AI 的回复不拆成多个气泡，全部放在一个气泡里（使用 Breeze 语音时自动按开启处理，见 ChatTtsController.isBreezeVoiceReply）
     val updatedAt: Long = System.currentTimeMillis()
 )
 
