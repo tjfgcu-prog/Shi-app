@@ -29,6 +29,12 @@ import kotlinx.coroutines.withTimeoutOrNull
 /** 语音合成升级任务专用的进程级作用域：不随聊天页销毁而取消 */
 private val voiceUpgradeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+/** 语音回复模式下，单个气泡最多多少字（单条语音最长约 60 秒，中文约 4~5 字/秒，留出余量） */
+private const val VOICE_CHUNK_MAX_CHARS = 200
+
+/** Breeze 合成很慢（固定开销约 17 秒 + 每秒语音约 3.6 秒），单个气泡别太长，免得一次要等好几分钟 */
+private const val BREEZE_VOICE_CHUNK_MAX_CHARS = 80
+
 /**
  * AI 回复落地处理器（从 ChatViewModel 抽取，方案B：独立类 + 委托存根）。
  *
@@ -36,7 +42,7 @@ private val voiceUpgradeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
  * 1. reasoning 展示
  * 2. 表情包标签处理
  * 3. L1+L2 关键词/向量安全检查 → 贝叶斯模型输出校验（fail-closed）
- * 4. 分段发送（模拟真人连续发消息）
+ * 4. 分段发送（模拟真人连续发消息；人物设置里开了"消息合并"、或正在用 Breeze 语音时不拆，整条回复一个气泡）
  * 5. 微信广播
  * 6. 记忆提取
  * 7. 连续追问（概率触发）
@@ -93,11 +99,18 @@ class AiResponseFinalizer(
         val settings = chatDetailSettingsStore.getSettings(companionId)
         val processedText = TextProcessor.processStickerTagsForSplit(aiContent, stickerManager, settings.stickerProbability) { sendStickerMessage(it) }
 
-        // 分段发送：将AI回复拆分为多条短消息，模拟真人连续发送
-        // 语音回复模式下，每段再按 60 秒上限二次切分
-        val rawSegments = splitIntoSegments(processedText)
+        // 分段发送：将AI回复拆分为多条短消息，模拟真人连续发送。
+        // 人物设置里开了"消息合并"、或正在用 Breeze 语音（逐句合成太慢）时不拆，整条回复放在一个气泡里。
+        // 语音回复模式下，每段再按单个气泡的字数上限二次切分
+        val breezeVoice = chatTtsController.isBreezeVoiceReply()
+        val rawSegments = if (settings.mergeMessages || breezeVoice) {
+            listOf(processedText.trim())
+        } else {
+            splitIntoSegments(processedText)
+        }
         val segments = if (chatTtsController.isVoiceReplyEnabled()) {
-            rawSegments.flatMap { chunkForVoice(it) }
+            val maxChars = if (breezeVoice) BREEZE_VOICE_CHUNK_MAX_CHARS else VOICE_CHUNK_MAX_CHARS
+            rawSegments.flatMap { chunkForVoice(it, maxChars) }
         } else {
             rawSegments
         }
@@ -234,12 +247,12 @@ class AiResponseFinalizer(
     }
 
     /**
-     * 语音回复模式下，单条语音气泡最长约 60 秒。
+     * 语音回复模式下，限制单个气泡的字数（单条语音最长约 60 秒；Breeze 合成慢，上限更小）。
      * 用"按字数截断"来控制时长（比合成后剪音频文件简单可靠，不同供应商都适用）：
      * 中文正常语速约 4~5 字/秒，200 字约 45~50 秒，留出安全余量。
-     * 超过 200 字的文本会被切成多段，作为连续多条语音气泡发送（跟真人连发语音一样）。
+     * 超过 [maxChars] 的文本会被切成多段，作为连续多条语音气泡发送（跟真人连发语音一样）。
      */
-    private fun chunkForVoice(text: String, maxChars: Int = 200): List<String> {
+    private fun chunkForVoice(text: String, maxChars: Int): List<String> {
         if (text.length <= maxChars) return listOf(text)
         val chunks = mutableListOf<String>()
         var remaining = text
