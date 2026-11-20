@@ -1247,6 +1247,9 @@ class ChatViewModel(
     /** 是否开启"语音回复"模式（供 UI/Finalizer 读取，实时读取最新配置） */
     fun isVoiceReplyEnabled(): Boolean = chatTtsConfig.mode == ChatTtsMode.VOICE_BAR
 
+    /** 是否正在用 Breeze 语音回复（人物设置页的"消息合并"开关据此自动打开并锁定） */
+    fun isBreezeVoiceReply(): Boolean = chatTtsController.isBreezeVoiceReply()
+
     
 
     
