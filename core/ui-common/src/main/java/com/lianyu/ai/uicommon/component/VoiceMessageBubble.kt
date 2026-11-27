@@ -5,7 +5,9 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
@@ -166,15 +168,57 @@ fun VoiceMessageBubble(
         }
 
         // 语音转文字内容：与语音条一并展示在同一气泡内
-        if (!text.isNullOrBlank()) {
-            Spacer(modifier = Modifier.height(6.dp))
+        VoiceBubbleText(text = text, color = iconColor)
+    }
+}
+
+/**
+ * 语音合成状态气泡：和语音气泡同样的外观，语音条位置显示一行状态文字
+ * （如"正在说话……"），文字内容仍在下方。合成完成后由 [VoiceMessageBubble] 取代它。
+ */
+@Composable
+fun VoiceStatusBubble(
+    statusText: String,
+    isUser: Boolean,
+    text: String? = null,
+    modifier: Modifier = Modifier
+) {
+    val bubbleColor = if (isUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+    val contentColor = if (isUser) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+
+    Column(
+        modifier = modifier
+            .widthIn(max = 230.dp)
+            .background(bubbleColor, RoundedCornerShape(16.dp))
+            .padding(horizontal = 10.dp, vertical = 8.dp)
+    ) {
+        // 高度和语音条一行保持一致，状态切换为语音条时气泡不会跳动
+        Box(
+            modifier = Modifier.height(24.dp).padding(start = 4.dp),
+            contentAlignment = Alignment.CenterStart
+        ) {
             Text(
-                text = text,
-                fontSize = 15.sp,
-                lineHeight = 20.sp,
-                color = iconColor
+                text = statusText,
+                fontSize = 13.sp,
+                color = contentColor.copy(alpha = 0.8f),
+                maxLines = 1
             )
         }
+        VoiceBubbleText(text = text, color = contentColor)
+    }
+}
+
+/** 气泡里语音下方的文字内容（语音转文字 / 合成中的原文）。 */
+@Composable
+private fun ColumnScope.VoiceBubbleText(text: String?, color: Color) {
+    if (!text.isNullOrBlank()) {
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = text,
+            fontSize = 15.sp,
+            lineHeight = 20.sp,
+            color = color
+        )
     }
 }
 
