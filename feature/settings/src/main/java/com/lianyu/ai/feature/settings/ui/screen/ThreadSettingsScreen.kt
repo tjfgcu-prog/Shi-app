@@ -42,7 +42,6 @@ import com.lianyu.ai.uicommon.theme.PetalPrimary
 
 /**
  * 线程页：语音合成、记忆向量、本地大模型的线程数设置。
- * 从原来的 AI 设置页搬过来，选项和保存逻辑不变。
  */
 @Composable
 fun ThreadSettingsScreen(onNavigateBack: () -> Unit) {
