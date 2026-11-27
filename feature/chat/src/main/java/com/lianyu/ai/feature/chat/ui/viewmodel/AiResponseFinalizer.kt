@@ -292,6 +292,8 @@ class AiResponseFinalizer(
      */
     private fun scheduleVoiceUpgrade(messageId: Long, text: String) {
         if (!chatTtsController.isVoiceReplyEnabled()) return
+        // 清洗后没有可朗读内容（纯动作描写、纯表情等）：没东西可合成，消息保持文字，不显示"正在说话……"
+        if (!chatTtsController.hasSpeakableText(text)) return
         VoiceSynthState.start(messageId)
         voiceUpgradeScope.launch {
             try {
