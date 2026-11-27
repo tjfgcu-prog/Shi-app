@@ -29,6 +29,13 @@ class ChatTtsController(
     fun isVoiceReplyEnabled(): Boolean = configProvider().mode == ChatTtsMode.VOICE_BAR
 
     /**
+     * 这段文字清洗后还有没有可朗读的内容。纯动作描写、纯表情之类清洗后为空，
+     * 本来就没有东西可合成，不算合成失败。
+     */
+    fun hasSpeakableText(text: String): Boolean =
+        TtsTextCleaner.clean(text, configProvider().skipParentheses).isNotBlank()
+
+    /**
      * 是否正在用 Breeze 语音回复（语音回复已开启，且语音引擎是 Breeze）。
      * Breeze 每次合成都有约 17 秒固定开销，逐句合成太亏，所以这时整条回复合并成一个气泡、只合成一次。
      */
