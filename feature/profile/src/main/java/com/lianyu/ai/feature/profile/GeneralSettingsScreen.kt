@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SaveAlt
 import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Speed
 
 import androidx.compose.material.icons.filled.TheaterComedy
 import androidx.compose.material.icons.filled.Token
@@ -86,7 +87,7 @@ import kotlinx.coroutines.launch
  *
  *   0. 自己设定    — 我的信息、各角色专属设定
  *   1. 记忆与管理  — 记忆管理、上下文记忆、角色扮演设置（点进去选角色头像，设置该角色的角色扮演）
- *   2. AI 与互动  — API 设置、语音、病娇模式
+ *   2. AI 与互动  — AI、语音、线程、病娇模式
  *   3. 实时日志    — 应用所有日志集中在这里
  *   4. 外观与数据  — 主题模式、聊天背景、帧率、思考设置、Token 统计、数据备份
  */
@@ -106,6 +107,7 @@ fun GeneralSettingsScreen(
     onThemeClick: () -> Unit,
     onFrameRateClick: () -> Unit,
     onTtsSettingsClick: () -> Unit,
+    onThreadSettingsClick: () -> Unit,
     onTokenUsageClick: () -> Unit,
     
     onDataBackupClick: () -> Unit,
@@ -166,11 +168,12 @@ fun GeneralSettingsScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // === AI 与互动：API 设置 / 语音 / 病娇模式 ===
+            // === AI 与互动：AI / 语音 / 线程 / 病娇模式 ===
             SolidMenuGroup(
                 items = listOf(
                     MenuItemData(Icons.Filled.Settings, stringResource(R.string.api_settings), stringResource(R.string.api_settings_desc), onSettingsClick),
                     MenuItemData(Icons.Filled.RecordVoiceOver, stringResource(R.string.tts_settings), stringResource(R.string.tts_settings_desc), onTtsSettingsClick),
+                    MenuItemData(Icons.Filled.Speed, "线程", "语音合成、记忆向量、大模型线程数", onThreadSettingsClick),
                     MenuItemData(Icons.Filled.Science, stringResource(R.string.yandere_mode), stringResource(R.string.yandere_mode_desc), onYandereModeClick)
                 ),
                 isVisible = isVisible, delayMillis = 60

@@ -69,7 +69,7 @@ import com.lianyu.ai.database.model.BannerTransform
  *   2. 个人资料卡（头像 + 昵称）
  *   3. 总设置入口
  *
- * 记忆管理、上下文记忆、API 设置、主题模式、聊天背景等次要项
+ * 记忆管理、上下文记忆、AI、主题模式、聊天背景等次要项
  * 全部收纳进"总设置"页（见 GeneralSettingsScreen），本页不再直接承载。
  */
 @Composable
