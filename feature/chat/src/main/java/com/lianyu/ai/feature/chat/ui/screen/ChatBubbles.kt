@@ -37,6 +37,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -71,6 +73,9 @@ import com.lianyu.ai.feature.chat.R
 import com.lianyu.ai.uicommon.component.CompanionAvatar
 import com.lianyu.ai.uicommon.component.UserAvatar
 import com.lianyu.ai.uicommon.component.VoiceMessageBubble
+import com.lianyu.ai.uicommon.component.VoiceStatusBubble
+import com.lianyu.ai.feature.chat.voice.VoiceSynthState
+import com.lianyu.ai.feature.chat.voice.VoiceSynthStatus
 import com.lianyu.ai.uicommon.theme.AdaptiveSizing
 
 import android.net.Uri
@@ -293,6 +298,9 @@ fun ChatBubble(
     var showMenu by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
     var editText by remember { mutableStateOf("") }
+    // 这条消息的语音合成状态：合成中显示"正在说话……"，失败/超时显示"对方还在思考"，没有记录则正常显示
+    val voiceSynthStates = VoiceSynthState.states.collectAsState()
+    val voiceSynth by remember(message.id) { derivedStateOf { voiceSynthStates.value[message.id] } }
     val isVoiceMessage = message.content.startsWith("[语音]") || message.type == MessageType.VOICE
     // 可编辑：语音消息，或普通文字消息（表情包 "[xxx]" 和图片不可编辑）
     val canEditMessage = isVoiceMessage ||
@@ -343,6 +351,7 @@ fun ChatBubble(
             } else {
                 message.content
             }
+            val synthStatus = voiceSynth
             if (isStickerMessage) {
                 StickerMessageBubble(
                     stickerName = message.content.removeSurrounding("[", "]")
@@ -354,13 +363,28 @@ fun ChatBubble(
                 val voicePath = message.linkString.ifBlank {
                     java.io.File(ctx.cacheDir, "voice_${message.id}.m4a").absolutePath
                 }
-                VoiceMessageBubble(
-                    audioPath = voicePath,
-                    duration = voiceDuration,
-                    isUser = isUser,
-                    text = voiceText,
-                    onResynthesize = onResynthesizeVoice?.let { callback -> { callback(message) } },
-                    onLongClick = if (hasLongPressMenu) ({ showMenu = true }) else null
+                if (synthStatus != null) {
+                    VoiceStatusBubble(
+                        statusText = voiceStatusText(synthStatus),
+                        isUser = isUser,
+                        text = voiceText
+                    )
+                } else {
+                    VoiceMessageBubble(
+                        audioPath = voicePath,
+                        duration = voiceDuration,
+                        isUser = isUser,
+                        text = voiceText,
+                        onResynthesize = onResynthesizeVoice?.let { callback -> { callback(message) } },
+                        onLongClick = if (hasLongPressMenu) ({ showMenu = true }) else null
+                    )
+                }
+            } else if (!isUser && synthStatus != null) {
+                // 刚生成的回复还是纯文字，语音在合成（或合成失败）：语音条位置显示状态
+                VoiceStatusBubble(
+                    statusText = voiceStatusText(synthStatus),
+                    isUser = false,
+                    text = displayContent
                 )
             } else if (message.type == MessageType.IMAGE) {
                 val imageFile = java.io.File(message.linkString.ifBlank { message.content })
@@ -730,4 +754,10 @@ internal fun rememberHorizontalSwipeGuard(): NestedScrollConnection {
             }
         }
     }
+}
+
+/** 语音条位置的状态文字。 */
+private fun voiceStatusText(status: VoiceSynthStatus): String = when (status) {
+    VoiceSynthStatus.SYNTHESIZING -> "正在说话……"
+    VoiceSynthStatus.FAILED -> "对方还在思考"
 }
