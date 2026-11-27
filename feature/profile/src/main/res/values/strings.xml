@@ -8,8 +8,8 @@
     <string name="profile_banner_hint">点击上传封面图</string>
     <string name="memory_management">记忆管理</string>
     <string name="memory_management_desc">查看虚拟恋人记住的关于你的事</string>
-    <string name="api_settings">API设置</string>
-    <string name="api_settings_desc">配置AI接口</string>
+    <string name="api_settings">AI</string>
+    <string name="api_settings_desc">云端本地设置</string>
     <string name="theme_mode">主题模式</string>
     <string name="theme_mode_desc">切换浅色/深色主题</string>
     <string name="chat_background">聊天背景</string>
