@@ -27,6 +27,7 @@ import com.lianyu.ai.database.repository.UserRepository
 import com.lianyu.ai.feature.chat.data.ChatContextResolver
 import com.lianyu.ai.feature.chat.R
 import com.lianyu.ai.feature.chat.voice.ChatTtsController
+import com.lianyu.ai.feature.chat.voice.VoiceSynthState
 
 import com.lianyu.ai.network.tts.ChatTtsConfig
 import com.lianyu.ai.network.tts.ChatTtsMode
@@ -657,7 +658,7 @@ class ChatViewModel(
             
 
             if (_availableApis.value.isEmpty()) {
-                _events.tryEmit(ChatUiEvent.Error("请先配置API：我 → API设置 → 添加密钥"))
+                _events.tryEmit(ChatUiEvent.Error("请先配置API：我 → AI → 添加密钥"))
             }
             val result = messageQueue.trySend(content)
             ChatDebugLog.log("[ChatVM] trySend result=$result, queueDepth=${_queueDepth.value}")
@@ -697,7 +698,7 @@ class ChatViewModel(
                 .getString("gguf_file_uri", null).isNullOrBlank()
             val tipMessage = ChatMessage(
                 companionId = companionId,
-                content = if (hasGguf) "本地模型还没加载：我 → API设置 → 点「加载并测试」" else "请先配置API：我 → API设置 → 添加密钥",
+                content = if (hasGguf) "本地模型还没加载：我 → AI → 点「加载并测试」" else "请先配置API：我 → AI → 添加密钥",
                 isFromUser = false,
                 timestamp = System.currentTimeMillis()
             )
@@ -1029,6 +1030,7 @@ class ChatViewModel(
                 do {
                     sid = kotlin.random.Random.nextInt(count)
                 } while (sid == current)
+                VoiceSynthState.start(message.id)
                 val result = chatTtsController.synthesizeVoiceReply(text, sid, null)
                 if (result != null) {
                     chatRepository.updateMessageAsVoice(
@@ -1043,6 +1045,7 @@ class ChatViewModel(
             } catch (e: Exception) {
                 SecureLog.w("ChatViewModel", "rereadWithAnotherVoice failed: ${e.message}")
             } finally {
+                VoiceSynthState.clear(message.id)
                 resynthesizingIds.remove(message.id)
             }
         }
@@ -1072,6 +1075,7 @@ class ChatViewModel(
         applicationApiScope.launch {
             try {
                 if (isVoice) {
+                    VoiceSynthState.start(message.id)
                     val result = chatTtsController.synthesizeVoiceReply(text)
                     if (result == null) {
                         showToast("语音合成失败，消息没有修改")
@@ -1091,6 +1095,8 @@ class ChatViewModel(
             } catch (e: Exception) {
                 SecureLog.w("ChatViewModel", "editAiMessage failed: ${e.message}")
                 showToast("修改失败")
+            } finally {
+                if (isVoice) VoiceSynthState.clear(message.id)
             }
         }
     }
@@ -1107,6 +1113,7 @@ class ChatViewModel(
         if (!resynthesizingIds.add(message.id)) return
         applicationApiScope.launch {
             try {
+                VoiceSynthState.start(message.id)
                 val result = chatTtsController.synthesizeVoiceReply(text)
                 if (result != null) {
                     val (path, duration) = result
@@ -1121,6 +1128,7 @@ class ChatViewModel(
             } catch (e: Exception) {
                 SecureLog.w("ChatViewModel", "resynthesizeVoice failed: ${e.message}")
             } finally {
+                VoiceSynthState.clear(message.id)
                 resynthesizingIds.remove(message.id)
             }
         }

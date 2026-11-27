@@ -15,6 +15,7 @@ import com.lianyu.ai.domain.AiServiceProvider
 import com.lianyu.ai.feature.chat.data.ChatContextResolver
 import com.lianyu.ai.feature.chat.data.ChatDetailSettingsStore
 import com.lianyu.ai.feature.chat.voice.ChatTtsController
+import com.lianyu.ai.feature.chat.voice.VoiceSynthState
 import com.lianyu.ai.database.model.MessageType
 import com.lianyu.ai.common.AppSettingsStore
 import kotlinx.coroutines.CoroutineScope
@@ -286,10 +287,12 @@ class AiResponseFinalizer(
      * 语音回复模式下，消息文字先落库展示，这里异步合成语音，成功后把该消息原地升级为语音气泡。
      * 用进程级作用域 [voiceUpgradeScope]（不是 applicationApiScope：它属于 ChatViewModel 实例，
      * 离开聊天页 onCleared 时会被取消），这样用户切走聊天页后，语音合成仍会继续完成并正确更新消息。
-     * 合成失败或超时：消息保持文字形式，不影响消息本身已经展示。
+     * 合成期间气泡的语音条位置显示"正在说话……"（见 [VoiceSynthState]）；
+     * 合成失败或超时：消息保持文字形式，语音条位置改显示"对方还在思考"。
      */
     private fun scheduleVoiceUpgrade(messageId: Long, text: String) {
         if (!chatTtsController.isVoiceReplyEnabled()) return
+        VoiceSynthState.start(messageId)
         voiceUpgradeScope.launch {
             try {
                 val startedAt = System.currentTimeMillis()
@@ -301,12 +304,15 @@ class AiResponseFinalizer(
                         com.lianyu.ai.common.VoiceMessageCodec.encode(duration, text),
                         path
                     )
+                    VoiceSynthState.clear(messageId)
                     ChatDebugLog.log("[TTS] 语音合成成功 id=$messageId, 耗时=${System.currentTimeMillis() - startedAt}ms, 语音${duration}秒")
                 } else {
+                    VoiceSynthState.markFailed(messageId)
                     SecureLog.w("ChatViewModel", "voice synthesis failed, message stays as text (id=$messageId)")
                     ChatDebugLog.log("[TTS] 语音合成失败/超时，消息保持文字 id=$messageId, 原因=${com.lianyu.ai.network.tts.CrispAsrTtsProvider.lastError ?: com.lianyu.ai.network.tts.SherpaLocalTtsProvider.lastError}")
                 }
             } catch (e: Exception) {
+                VoiceSynthState.markFailed(messageId)
                 SecureLog.w("ChatViewModel", "voice upgrade failed for id=$messageId: ${e.message}")
             }
         }
