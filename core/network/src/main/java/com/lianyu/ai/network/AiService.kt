@@ -374,10 +374,10 @@ class AiService(context: Context) : AiServiceProvider {
         return SecureLog.timed("AiService", "sendMessage") {
             withContext(Dispatchers.IO) {
                 val config = resolveConfig()
-                    ?: return@withContext AiResponse("请先配置并启用可用的API。在「我」->「API设置」中添加密钥并测试连接。")
+                    ?: return@withContext AiResponse("请先配置并启用可用的API。在「我」->「AI」中添加密钥并测试连接。")
 
                 if (config.model.isBlank()) {
-                    return@withContext AiResponse("模型名未配置，请在「API设置」中重新测试连接以自动选择模型。")
+                    return@withContext AiResponse("模型名未配置，请在「AI」中重新测试连接以自动选择模型。")
                 }
 
                 val sortedHistory = history.sortedBy { it.timestamp }
@@ -545,10 +545,10 @@ class AiService(context: Context) : AiServiceProvider {
         return SecureLog.timed("AiService", "sendMessageWithCustomSystem") {
             withContext(Dispatchers.IO) {
                 val config = resolveConfig()
-                    ?: return@withContext "请先配置并启用可用的API。在「我」->「API设置」中添加密钥并测试连接。"
+                    ?: return@withContext "请先配置并启用可用的API。在「我」->「AI」中添加密钥并测试连接。"
 
                 if (config.model.isBlank()) {
-                    return@withContext "模型名未配置，请在「API设置」中重新测试连接以自动选择模型。"
+                    return@withContext "模型名未配置，请在「AI」中重新测试连接以自动选择模型。"
                 }
 
                 val sortedHistory = history.sortedBy { it.timestamp }
@@ -1570,12 +1570,12 @@ $chatText
 
                 if (config == null) {
                     SecureLog.e("VISION", "ERROR: config is null!")
-                    return@withContext AiResponse("请先配置并启用可用的API。在「我」->「API设置」中添加密钥并测试连接。")
+                    return@withContext AiResponse("请先配置并启用可用的API。在「我」->「AI」中添加密钥并测试连接。")
                 }
 
                 if (config.model.isBlank()) {
                     SecureLog.e("VISION", "ERROR: model is blank!")
-                    return@withContext AiResponse("模型名未配置，请在「API设置」中重新测试连接以自动选择模型。")
+                    return@withContext AiResponse("模型名未配置，请在「AI」中重新测试连接以自动选择模型。")
                 }
 
                 val isVisionEnabled = try {
@@ -1589,7 +1589,7 @@ $chatText
 
                 if (!isVisionEnabled) {
                     SecureLog.w("VISION", "WARNING: Vision is DISABLED, returning early")
-                    return@withContext AiResponse("[TOAST]视觉识别功能已关闭，请在「API设置」->「视觉识别设置」中开启")
+                    return@withContext AiResponse("[TOAST]视觉识别功能已关闭，请在「AI」->「视觉识别设置」中开启")
                 }
 
                 val visionModelSetting = try {
