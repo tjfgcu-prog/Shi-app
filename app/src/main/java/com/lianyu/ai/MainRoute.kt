@@ -31,6 +31,7 @@ sealed class MainRoute(val route: String) {
     // === 设置 ===
     object Settings : MainRoute("settings")
     object TtsSettings : MainRoute("tts_settings")
+    object ThreadSettings : MainRoute("thread_settings")
     object TokenUsage : MainRoute("token_usage")
     object Theme : MainRoute("theme")
     

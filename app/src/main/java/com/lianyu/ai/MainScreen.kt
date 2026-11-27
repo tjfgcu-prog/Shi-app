@@ -73,7 +73,7 @@ import kotlinx.coroutines.launch
  *
  * 路由: Home, Contacts, Profile, Chat(id), ChatDetail(id),
  *       GroupChat(id), GroupDetail(id), CreateGroup, CreateCompanion, EditCompanion(id),
- *       Settings, TtsSettings, TokenUsage, Theme, FrameRate, YandereMode,
+ *       Settings, TtsSettings, ThreadSettings, TokenUsage, Theme, FrameRate, YandereMode,
  *       GeneralSettings, Memory, ContextMemory, SelfProfile, CompanionSelfProfile(id), DataBackup,
  *       RoleplayCompanions, RoleplaySettings(id), LiveLog
  *   差分方程: S[k+1] = f(S[k], E[k])
@@ -299,6 +299,7 @@ fun MainScreen(mainActivity: Activity) {
                 // === 设置 ===
                 composable(MainRoute.Settings.route) { SettingsScreen(onNavigateBack = { navController.popBackStack() }) }
                 composable(MainRoute.TtsSettings.route) { TtsSettingsScreen(onNavigateBack = { navController.popBackStack() }, isDarkTheme = isDark) }
+                composable(MainRoute.ThreadSettings.route) { ThreadSettingsScreen(onNavigateBack = { navController.popBackStack() }) }
                 composable(MainRoute.TokenUsage.route) { TokenUsageScreen(onNavigateBack = { navController.popBackStack() }) }
                 composable(MainRoute.LiveLog.route) { com.lianyu.ai.feature.settings.ui.screen.LiveLogScreen(onNavigateBack = { navController.popBackStack() }) }
                 composable(MainRoute.Memory.route) { MemoryScreen(onNavigateBack = { navController.popBackStack() }) }
@@ -336,6 +337,7 @@ fun MainScreen(mainActivity: Activity) {
                         onThemeClick = { navController.navigate(MainRoute.Theme.route) },
                         onFrameRateClick = { navController.navigate(MainRoute.FrameRate.route) },
                         onTtsSettingsClick = { navController.navigate(MainRoute.TtsSettings.route) },
+                        onThreadSettingsClick = { navController.navigate(MainRoute.ThreadSettings.route) },
                         onTokenUsageClick = { navController.navigate(MainRoute.TokenUsage.route) },
                         
                         onDataBackupClick = { navController.navigate(MainRoute.DataBackup.route) },
