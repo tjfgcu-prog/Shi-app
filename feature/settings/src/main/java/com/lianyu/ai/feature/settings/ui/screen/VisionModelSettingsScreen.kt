@@ -581,7 +581,7 @@ fun VisionModelSettingsScreen(
                     Text(text = "📋 配置说明", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = textPrimaryColor)
 
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        InfoItem(icon = "�", title = "跟随主API（推荐）", content = "选择「跟随主API设置」时，将自动使用您在API设置页面配置的连接信息，无需重复填写。", textColor = textPrimaryColor, secondaryColor = textSecondaryColor)
+                        InfoItem(icon = "�", title = "跟随主API（推荐）", content = "选择「跟随主API设置」时，将自动使用您在AI页面配置的连接信息，无需重复填写。", textColor = textPrimaryColor, secondaryColor = textSecondaryColor)
                         InfoItem(icon = "�", title = "独立配置", content = "如果视觉模型需要使用不同的API提供商（如用Kimi Key调用Kimi K2.6），请在此处单独填写URL和Key。", textColor = textPrimaryColor, secondaryColor = textSecondaryColor)
                         InfoItem(icon = "⚠️", title = "注意事项", content = "确保所选模型与API提供商匹配！例如：Kimi K2.6 必须搭配 Moonshot 的 Key 和 URL。", textColor = textPrimaryColor, secondaryColor = textSecondaryColor)
                     }

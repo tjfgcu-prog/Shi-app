@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
@@ -25,16 +26,15 @@ import androidx.compose.material.icons.filled.ExpandMore
 
 
 
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 
 
 
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 
 
-import androidx.compose.material3.OutlinedButton
 
 
 
@@ -405,30 +405,110 @@ fun PetalSavedApiCard(
 }
 
 // ============================================================
-// PetalAddApiButton - 添加 API 配置按钮
+// PetalAddApiVisionCard - 「添加API配置」与「视觉模型设置」合并卡片
 // ============================================================
 
 @Composable
-fun PetalAddApiButton(onClick: () -> Unit, isDarkTheme: Boolean) {
-    OutlinedButton(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = ButtonDefaults.outlinedButtonColors(
-            contentColor = PetalPrimary
-        )
+fun PetalAddApiVisionCard(
+    visionSubtitle: String,
+    onAddApiClick: () -> Unit,
+    onVisionClick: () -> Unit,
+    textPrimaryColor: Color,
+    textSecondaryColor: Color
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
     ) {
-        Icon(
-            imageVector = Icons.Filled.Add,
-            contentDescription = "添加API",
-            modifier = Modifier.size(18.dp),
-            tint = PetalPrimary
+        PetalAiEntryRow(
+            iconContent = {
+                Icon(
+                    imageVector = Icons.Filled.Add,
+                    contentDescription = "添加API",
+                    tint = PetalPrimary,
+                    modifier = Modifier.size(24.dp)
+                )
+            },
+            title = "添加API配置",
+            subtitle = null,
+            onClick = onAddApiClick,
+            textPrimaryColor = textPrimaryColor,
+            textSecondaryColor = textSecondaryColor
         )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = "添加API配置",
-            color = PetalPrimary,
-            fontSize = 14.sp
+
+        // 两行之间的分隔线（从文字起点开始，不贯穿图标区）
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 80.dp, end = 20.dp)
+                .height(0.5.dp)
+                .background(MaterialTheme.colorScheme.outline)
+        )
+
+        PetalAiEntryRow(
+            iconContent = { Text(text = "👁", fontSize = 22.sp) },
+            title = "视觉模型设置",
+            subtitle = visionSubtitle,
+            onClick = onVisionClick,
+            textPrimaryColor = textPrimaryColor,
+            textSecondaryColor = textSecondaryColor
+        )
+    }
+}
+
+/** 合并卡片里的一行：左侧圆角图标块 + 标题（可带副标题）+ 右侧箭头。 */
+@Composable
+private fun PetalAiEntryRow(
+    iconContent: @Composable () -> Unit,
+    title: String,
+    subtitle: String?,
+    onClick: () -> Unit,
+    textPrimaryColor: Color,
+    textSecondaryColor: Color
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 20.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(PetalPrimaryContainer.copy(alpha = 0.15f)),
+            contentAlignment = Alignment.Center
+        ) {
+            iconContent()
+        }
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = textPrimaryColor
+            )
+            if (subtitle != null) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = subtitle,
+                    fontSize = 12.sp,
+                    color = textSecondaryColor
+                )
+            }
+        }
+
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = textSecondaryColor,
+            modifier = Modifier.size(20.dp)
         )
     }
 }

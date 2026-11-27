@@ -227,7 +227,7 @@ fun SettingsScreen(
                 }
 
                 Text(
-                    text = "API 设置",
+                    text = "AI",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = textPrimaryColor
@@ -271,73 +271,12 @@ fun SettingsScreen(
                 onShowProviderPickerChange = { showProviderPicker = it },
                 // [R7 FIX] 传入 StateFlow 解构后的 Map 值
                 connectionStatus = connectionStatus,
-                testedConfigs = testedConfigs
+                testedConfigs = testedConfigs,
+                visionSubtitle = if (visionEnabled) "已启用 - ${AppSettingsStore.VisionModels.getVisionModelDisplayName(visionModel)}" else "点击配置图片识别",
+                onVisionClick = { showVisionModelSettings = true }
             )
 
-            
-
-// ====== Vision Model Settings Section ======
-            AnimatedVisibility(
-                visible = isVisible,
-                enter = fadeIn(tween(200, delayMillis = 100)) +
-        slideInVertically(tween(200, delayMillis = 100)) { it / 4 }
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp)
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .clickable { showVisionModelSettings = true }
-                        .padding(20.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(PetalPrimaryContainer.copy(alpha = 0.15f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "👁",
-                                fontSize = 22.dp.value.sp
-                            )
-                        }
-
-                        Column {
-                            Text(
-                                text = "视觉模型设置",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = textPrimaryColor
-                            )
-                            Text(
-                                text = if (visionEnabled) "已启用 - ${AppSettingsStore.VisionModels.getVisionModelDisplayName(visionModel)}" else "点击配置图片识别",
-                                fontSize = 12.sp,
-                                color = textSecondaryColor
-                            )
-                        }
-                    }
-
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "进入设置",
-                        tint = textSecondaryColor,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            
-Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(32.dp))
 
             // ====== GGUF Local Model Section (custom import) ======
             GgufLocalModelSection(
@@ -586,7 +525,9 @@ private fun ApiCardsSection(
     onShowProviderPickerChange: (Boolean) -> Unit,
     // [R7 FIX] 传入 StateFlow 解构后的 Map 值
     connectionStatus: Map<String, SettingsViewModel.ConnectionResult>,
-    testedConfigs: Map<String, ApiConfig>
+    testedConfigs: Map<String, ApiConfig>,
+    visionSubtitle: String,
+    onVisionClick: () -> Unit
 ) {
     AnimatedVisibility(
         visible = isVisible,
@@ -629,11 +570,12 @@ private fun ApiCardsSection(
                 )
             }
 
-            PetalAddApiButton(
-                onClick = {
-                    onShowProviderPickerChange(true)
-                },
-                isDarkTheme = isDarkTheme
+            PetalAddApiVisionCard(
+                visionSubtitle = visionSubtitle,
+                onAddApiClick = { onShowProviderPickerChange(true) },
+                onVisionClick = onVisionClick,
+                textPrimaryColor = textPrimaryColor,
+                textSecondaryColor = textSecondaryColor
             )
         }
     }
@@ -962,73 +904,6 @@ private fun GgufLocalModelSection(
                     }
                 }
             }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // 卡片2.5：线程数（语音合成 / 记忆向量）
-        var ttsThreads by remember { mutableStateOf(com.lianyu.ai.common.PerfPrefs.ttsThreads(context)) }
-        var embeddingThreads by remember { mutableStateOf(com.lianyu.ai.common.PerfPrefs.embeddingThreads(context)) }
-        var llmThreads by remember { mutableStateOf(com.lianyu.ai.common.PerfPrefs.llmThreads(context)) }
-        val cpuCores = remember { com.lianyu.ai.common.PerfPrefs.cpuCores() }
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp)
-                .clip(RoundedCornerShape(20.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text(
-                text = "线程数（高级）",
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = textPrimaryColor
-            )
-            Text(
-                text = "线程越多通常越快，但会和大模型抢 CPU、更耗电。本机共 $cpuCores 个核心。",
-                fontSize = 11.sp,
-                color = textSecondaryColor
-            )
-            Text(text = "语音合成线程（默认 2，下一句话生效）", fontSize = 12.sp, color = textSecondaryColor)
-            ThreadChipRow(
-                options = (1..cpuCores).toList().take(8),
-                selected = ttsThreads,
-                labelOf = { it.toString() },
-                textSecondaryColor = textSecondaryColor,
-                onSelect = {
-                    ttsThreads = it
-                    com.lianyu.ai.common.PerfPrefs.setTtsThreads(context, it)
-                }
-            )
-            Text(text = "记忆向量线程（默认自动，重启 App 后生效）", fontSize = 12.sp, color = textSecondaryColor)
-            ThreadChipRow(
-                options = listOf(0) + (1..cpuCores).toList().take(7),
-                selected = embeddingThreads,
-                labelOf = { if (it == 0) "自动" else it.toString() },
-                textSecondaryColor = textSecondaryColor,
-                onSelect = {
-                    embeddingThreads = it
-                    com.lianyu.ai.common.PerfPrefs.setEmbeddingThreads(context, it)
-                }
-            )
-            Text(text = "大模型线程（默认自动，改完下次生成回复时会重新加载模型）", fontSize = 12.sp, color = textSecondaryColor)
-            ThreadChipRow(
-                options = listOf(0) + (1..cpuCores).toList().take(7),
-                selected = llmThreads,
-                labelOf = { if (it == 0) "自动" else it.toString() },
-                textSecondaryColor = textSecondaryColor,
-                onSelect = {
-                    llmThreads = it
-                    com.lianyu.ai.common.PerfPrefs.setLlmThreads(context, it)
-                }
-            )
-            Text(
-                text = "自动 = 交给 llama 库决定（按它的来源，8 核手机上通常是 4 个）。线程不是越多越快：超过大核数量后反而会变慢、更烫，建议从 4 开始试。改线程数会让下一次回复多等一次模型加载（约 15 到 20 秒）。",
-                fontSize = 11.sp,
-                color = textSecondaryColor
-            )
         }
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -1526,40 +1401,4 @@ fun ApiConfigEditDialog(
             }
         }
     )
-}
-
-
-
-/** 一排可选的线程数按钮（与"上下文长度"按钮同样式）。 */
-@Composable
-private fun ThreadChipRow(
-    options: List<Int>,
-    selected: Int,
-    labelOf: (Int) -> String,
-    textSecondaryColor: Color,
-    onSelect: (Int) -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        options.forEach { option ->
-            val isSelected = selected == option
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(if (isSelected) PetalPrimary else MaterialTheme.colorScheme.surface)
-                    .clickable { onSelect(option) }
-                    .padding(vertical = 10.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = labelOf(option),
-                    fontSize = 12.sp,
-                    color = if (isSelected) Color.White else textSecondaryColor
-                )
-            }
-        }
-    }
 }
