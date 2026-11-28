@@ -58,7 +58,7 @@ object SystemBarController {
             Color(0xFFFFFFFF).copy(alpha = 0.55f)
         }
 
-        // 状态栏使用不透明纯色，浅色主题用纯白避免显粉；深色主题用背景色保持一致。
+        // 状态栏使用不透明纯色，浅色主题用纯白；深色主题用背景色保持一致。
         activity.window.statusBarColor = if (isDark) {
             WeChatDarkBackground.toArgb()
         } else {
