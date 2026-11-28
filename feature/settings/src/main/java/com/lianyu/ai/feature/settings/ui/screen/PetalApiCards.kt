@@ -63,31 +63,16 @@ import androidx.compose.ui.unit.sp
 import com.lianyu.ai.database.model.ApiConfig
 import com.lianyu.ai.database.model.ApiProvider
 import com.lianyu.ai.feature.settings.ui.viewmodel.SettingsViewModel
+import com.lianyu.ai.uicommon.theme.PetalError
+import com.lianyu.ai.uicommon.theme.PetalGreen
+import com.lianyu.ai.uicommon.theme.PetalOrange
+import com.lianyu.ai.uicommon.theme.PetalPrimary
+import com.lianyu.ai.uicommon.theme.PetalPrimaryContainer
+import com.lianyu.ai.uicommon.theme.PetalSecondaryContainer
+import com.lianyu.ai.uicommon.theme.PetalSurfaceContainerLow
 
 
 
-
-// ============================================================
-// Petal Color Constants
-// ============================================================
-
-internal val PetalBackgroundStart = Color(0xFFFBF9F8)
-
-internal val PetalPrimary = Color(0xFF894C5C)
-internal val PetalPrimaryContainer = Color(0xFFF4A7B9)
-internal val PetalOnPrimaryContainer = Color(0xFF733949)
-internal val PetalSurface = Color(0xFFFFFFFF)
-internal val PetalSurfaceContainer = Color(0xFFEFEDED)
-internal val PetalSurfaceContainerLow = Color(0xFFF5F3F3)
-internal val PetalSecondaryContainer = Color(0xFFEBDCDF)
-internal val PetalOnSurface = Color(0xFF1B1C1C)
-internal val PetalOnSurfaceVariant = Color(0xFF524346)
-internal val PetalOutlineVariant = Color(0xFFD6C1C5)
-internal val PetalError = Color(0xFFBA1A1A)
-internal val PetalErrorContainer = Color(0xFFFFDAD6)
-internal val PetalGreen = Color(0xFF10A37F)
-internal val PetalGreenLight = Color(0xFFE8F5E9)
-internal val PetalOrange = Color(0xFFFFA726)
 
 // ═══ 自定义中继 error code mapping ═══
 private fun mapErrorCode(code: String): String = when (code) {
