@@ -334,7 +334,7 @@ externalNativeBuild {
 |------|------|----------|
 | **`theme/` 主题系统** | | |
 | `Theme.kt` | Composable | 主题入口 `LianYuTheme`（亮/暗/跟随系统） |
-| `Color.kt` | 常量 | 微信风格色板 + 旧版色值（保持兼容） |
+| `Color.kt` | 常量 | 紫色主题色板（亮/暗）+ 设置页 Petal 色值 |
 | `Type.kt` | 常量 | 字体排版定义 `AppTypography` |
 | **`component/` 共享组件** | | |
 | `LiquidGlass.kt` | Composable | 液态玻璃特效（`frostedGlassNav`、`liquidGlass`、`ellipseLiquidGlass`） |
