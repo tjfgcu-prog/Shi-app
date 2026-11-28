@@ -54,7 +54,7 @@ fun ProviderLogo(
         )
     } else {
         val (text, bgColor, textColor) = when (provider) {
-            ApiProvider.PARTNER -> Triple("C", Color(0xFFFF69B4), Color.White)
+            ApiProvider.PARTNER -> Triple("C", Color(0xFF00ACC1), Color.White)
             ApiProvider.IFLYTEK -> Triple("讯", Color(0xFF1677FF), Color.White)
             ApiProvider.CUSTOM -> Triple("?", Color(0xFF888888).copy(alpha = 0.15f), Color(0xFF888888))
             else -> Triple("?", Color(0xFF888888).copy(alpha = 0.15f), Color(0xFF888888))
