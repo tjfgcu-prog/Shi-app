@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
@@ -69,9 +70,17 @@ import com.lianyu.ai.common.AppSettingsStore
 
 import com.lianyu.ai.feature.settings.R
 import com.lianyu.ai.feature.settings.ui.viewmodel.SettingsViewModel
+import com.lianyu.ai.uicommon.theme.PetalGreen
+import com.lianyu.ai.uicommon.theme.PetalOnSurface
+import com.lianyu.ai.uicommon.theme.PetalOnSurfaceVariant
+import com.lianyu.ai.uicommon.theme.PetalOrange
+import com.lianyu.ai.uicommon.theme.PetalOutlineVariant
+import com.lianyu.ai.uicommon.theme.PetalPrimary
+import com.lianyu.ai.uicommon.theme.PetalPrimaryContainer
+import com.lianyu.ai.uicommon.theme.PetalSurface
+import com.lianyu.ai.uicommon.theme.PetalSurfaceContainer
 import com.lianyu.ai.uicommon.theme.ThemeMode
 import com.lianyu.ai.uicommon.theme.ThemeViewModel
-import com.lianyu.ai.uicommon.theme.WeChatDarkBackground
 import com.lianyu.ai.uicommon.theme.WeChatDarkCard
 import com.lianyu.ai.uicommon.theme.WeChatDarkDivider
 import com.lianyu.ai.uicommon.theme.WeChatDarkTextPrimary
@@ -126,7 +135,7 @@ fun VisionModelSettingsScreen(
 
     
 
-    val backgroundColor = if (isDarkTheme) WeChatDarkBackground else PetalBackgroundStart
+    val backgroundColor = MaterialTheme.colorScheme.background
     val textPrimaryColor = if (isDarkTheme) WeChatDarkTextPrimary else PetalOnSurface
     val textSecondaryColor = if (isDarkTheme) WeChatDarkTextSecondary else PetalOnSurfaceVariant
     val textTertiaryColor = if (isDarkTheme) WeChatDarkTextTertiary else PetalOutlineVariant
