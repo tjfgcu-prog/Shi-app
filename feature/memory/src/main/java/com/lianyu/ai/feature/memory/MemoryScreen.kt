@@ -602,7 +602,7 @@ fun TierBadge(memory: MemoryItem) {
             .clip(RoundedCornerShape(4.dp))
             .background(
                 if (isPermanent) {
-                    Color(0xFFE8B4C0).copy(alpha = 0.35f)
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
                 } else {
                     MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.12f)
                 }
@@ -612,7 +612,7 @@ fun TierBadge(memory: MemoryItem) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Medium),
-            color = if (isPermanent) Color(0xFFB05C74) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+            color = if (isPermanent) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
         )
     }
 }
