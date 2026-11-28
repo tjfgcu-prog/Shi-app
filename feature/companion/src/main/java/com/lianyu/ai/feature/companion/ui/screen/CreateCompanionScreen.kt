@@ -96,6 +96,8 @@ import coil.compose.AsyncImage
 
 import com.lianyu.ai.database.model.CompanionEntity
 import com.lianyu.ai.feature.companion.ui.viewmodel.CreateCompanionViewModel
+import com.lianyu.ai.uicommon.theme.PurpleDark
+import com.lianyu.ai.uicommon.theme.PurplePrimary
 
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -220,10 +222,10 @@ fun CreateCompanionScreen(
     }
 
     val colorScheme = MaterialTheme.colorScheme
-    val accentColor = Color(0xFFFF6B9D)
+    val accentColor = PurpleDark
     val accentGradient = listOf(
-        Color(0xFFFF6B9D).copy(alpha = 0.9f),
-        Color(0xFFFF8FB3).copy(alpha = 0.8f)
+        PurpleDark.copy(alpha = 0.9f),
+        PurplePrimary.copy(alpha = 0.8f)
     )
     val roleIcon: ImageVector = Icons.Filled.Favorite
 
