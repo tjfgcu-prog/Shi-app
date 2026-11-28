@@ -44,6 +44,11 @@ import androidx.compose.ui.unit.sp
 import com.lianyu.ai.network.tts.*
 import com.lianyu.ai.uicommon.theme.*
 
+import com.lianyu.ai.uicommon.theme.PetalError
+import com.lianyu.ai.uicommon.theme.PetalGreen
+import com.lianyu.ai.uicommon.theme.PetalOnPrimaryContainer
+import com.lianyu.ai.uicommon.theme.PetalPrimary
+import com.lianyu.ai.uicommon.theme.PetalPrimaryContainer
 import kotlinx.coroutines.launch
 
 @Composable
