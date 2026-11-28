@@ -3,36 +3,37 @@ package com.lianyu.ai.uicommon.theme
 import androidx.compose.ui.graphics.Color
 
 // ============================================================
-// Pink Romance Theme - Dark Mode (Primary)
+// Lavender Theme - Dark Mode
 // ============================================================
 
 // Background
-val WeChatDarkBackground = Color(0xFF1A1216)
-val WeChatDarkSurface = Color(0xFF241B20)
-val WeChatDarkCard = Color(0xFF2D2228)
-val WeChatDarkDivider = Color(0xFF3D2F36)
+val WeChatDarkBackground = Color(0xFF17131F)
+val WeChatDarkSurface = Color(0xFF201A2B)
+val WeChatDarkCard = Color(0xFF2A2237)
+val WeChatDarkDivider = Color(0xFF3A3149)
 
 // Text
-val WeChatDarkTextPrimary = Color(0xFFF5E6EB)
-val WeChatDarkTextSecondary = Color(0xFFB8A0A8)
-val WeChatDarkTextTertiary = Color(0xFF8A727C)
+val WeChatDarkTextPrimary = Color(0xFFEEE9F8)
+val WeChatDarkTextSecondary = Color(0xFFB1A8C6)
+val WeChatDarkTextTertiary = Color(0xFF837A9B)
 
-// Pink accent
-val PinkPrimary = Color(0xFFF4A6B5)
-val PinkLight = Color(0xFFF8C8D8)
-val PinkDark = Color(0xFFD48494)
+// Purple accent
+val PurplePrimary = Color(0xFFA48BDD)
+val PurpleLight = Color(0xFFD5C6F2)
+val PurpleDark = Color(0xFF8A6FCF)
 
 
 // ============================================================
-// Pink Romance Theme - Light Mode
+// Lavender Theme - Light Mode
 // ============================================================
 
-val WeChatLightBackground = Color(0xFFFFF5F7)
-val WeChatLightSurface = Color(0xFFFFEEF2)
+val WeChatLightBackground = Color(0xFFF5F0FF)
+val WeChatLightSurface = Color(0xFFEFE8FB)
 val WeChatLightCard = Color(0xFFFFFFFF)
-val WeChatLightDivider = Color(0xFFF0D5DC)
-val WeChatLightTextPrimary = Color(0xFF2D1F24)
-val WeChatLightTextSecondary = Color(0xFF8A6B74)
+val WeChatLightDivider = Color(0xFFE1D7F2)
+val WeChatLightTextPrimary = Color(0xFF241D31)
+val WeChatLightTextSecondary = Color(0xFF7A6E90)
+val PurpleSecondary = Color(0xFF7E6BA3)
 
 // ============================================================
 // Status Colors
@@ -41,17 +42,21 @@ val WeChatLightTextSecondary = Color(0xFF8A6B74)
 val ErrorRed = Color(0xFFFA5151)
 
 // ============================================================
-// Legacy / Compatibility Colors
+// Petal Soft UI Colors (settings screens)
 // ============================================================
 
-
-
-// Petal Soft UI Colors
-val PetalPrimary = Color(0xFF894C5C)
-val PetalPrimaryContainer = Color(0xFFF4A7B9)
-val PetalOnPrimaryContainer = Color(0xFF733949)
+val PetalPrimary = Color(0xFF6B52B0)
+val PetalPrimaryContainer = Color(0xFFD8CBF6)
+val PetalOnPrimaryContainer = Color(0xFF3E2E78)
 val PetalSurface = Color(0xFFFFFFFF)
-val PetalSurfaceContainer = Color(0xFFEFEDED)
-val PetalOnSurfaceVariant = Color(0xFF524346)
-val PetalGreen = Color(0xFF10A37F)
+val PetalSurfaceContainer = Color(0xFFEDE9F6)
+val PetalSurfaceContainerLow = Color(0xFFF4F1FA)
+val PetalSecondaryContainer = Color(0xFFE6DEF5)
+val PetalOnSurface = Color(0xFF1D1B26)
+val PetalOnSurfaceVariant = Color(0xFF4A4560)
+val PetalOutlineVariant = Color(0xFFCFC6E0)
 val PetalError = Color(0xFFBA1A1A)
+val PetalErrorContainer = Color(0xFFFFDAD6)
+val PetalGreen = Color(0xFF10A37F)
+val PetalGreenLight = Color(0xFFE8F5E9)
+val PetalOrange = Color(0xFFFFA726)
