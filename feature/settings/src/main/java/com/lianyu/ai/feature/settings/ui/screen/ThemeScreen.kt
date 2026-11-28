@@ -50,6 +50,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.statusBars
+import com.lianyu.ai.uicommon.theme.WeChatLightBackground
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -132,7 +133,7 @@ fun ThemeScreen(
                 title = stringResource(R.string.theme_light),
                 subtitle = stringResource(R.string.theme_light_desc),
                 isSelected = currentTheme == ThemeMode.LIGHT,
-                previewColor = Color(0xFFFFF8FA),
+                previewColor = WeChatLightBackground,
                 cardColor = cardColor,
                 textPrimaryColor = textPrimaryColor,
                 dividerColor = dividerColor,
