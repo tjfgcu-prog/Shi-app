@@ -106,6 +106,11 @@ import com.lianyu.ai.database.model.ApiProvider
 
 import com.lianyu.ai.feature.settings.R
 import com.lianyu.ai.feature.settings.ui.viewmodel.SettingsViewModel
+import com.lianyu.ai.uicommon.theme.PetalError
+import com.lianyu.ai.uicommon.theme.PetalErrorContainer
+import com.lianyu.ai.uicommon.theme.PetalGreen
+import com.lianyu.ai.uicommon.theme.PetalGreenLight
+import com.lianyu.ai.uicommon.theme.PetalOrange
 import com.lianyu.ai.uicommon.theme.PetalPrimary
 import com.lianyu.ai.uicommon.theme.ThemeMode
 import com.lianyu.ai.uicommon.theme.ThemeViewModel
