@@ -24,7 +24,7 @@ data class ApiProviderInfo(
         val SILICONFLOW = ApiProviderInfo("SILICONFLOW", "硅基流动", Color(0xFF10A37F))
         val OPENROUTER = ApiProviderInfo("OPENROUTER", "OpenRouter", Color(0xFF7B68EE))
         val GROQ = ApiProviderInfo("GROQ", "Groq", Color(0xFFF4845F))
-        val PARTNER = ApiProviderInfo("PARTNER", "自定义中继", Color(0xFFFF69B4))
+        val PARTNER = ApiProviderInfo("PARTNER", "自定义中继", Color(0xFF00ACC1))
         val CUSTOM = ApiProviderInfo("CUSTOM", "自定义", Color(0xFFFF6B6B))
         val LOCAL = ApiProviderInfo("LOCAL", "本地模型", Color(0xFF00C853))
 
