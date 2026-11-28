@@ -40,7 +40,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -52,12 +51,11 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lianyu.ai.common.AppSettingsStore
 
 import androidx.lifecycle.ViewModelProvider
+import com.lianyu.ai.uicommon.theme.PetalPrimary
+import com.lianyu.ai.uicommon.theme.PetalSurfaceContainer
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-
-private val PetalPrimary = Color(0xFF894C5C)
-private val PetalSurfaceContainer = Color(0xFFEFEDED)
 
 class ContextMemoryViewModel(context: android.content.Context) : androidx.lifecycle.ViewModel() {
     private val appSettingsStore = AppSettingsStore(context)
