@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
 import coil.compose.AsyncImage
 import com.lianyu.ai.uicommon.R
+import com.lianyu.ai.uicommon.theme.WeChatDarkBackground
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -245,7 +246,7 @@ fun getChatBackground(context: Context, isDark: Boolean): Pair<Color, Brush?> {
 
 fun getChatBackgroundByKey(context: Context, key: String, isDark: Boolean): Pair<Color, Brush?> {
     if (isCustomBackground(key)) {
-        val fallback = if (isDark) Color(0xFF1A1216) else Color(0xFFF5F5F5)
+        val fallback = if (isDark) WeChatDarkBackground else Color(0xFFF5F5F5)
         return fallback to null
     }
     val allOptions = chatBackgroundOptions(context)
