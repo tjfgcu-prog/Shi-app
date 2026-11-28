@@ -44,7 +44,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.res.stringResource
 import com.lianyu.ai.feature.settings.R
 import com.lianyu.ai.common.FrameRateManager
-import com.lianyu.ai.uicommon.theme.PinkPrimary
+import com.lianyu.ai.uicommon.theme.PurplePrimary
 import com.lianyu.ai.uicommon.theme.ThemeViewModel
 import com.lianyu.ai.uicommon.theme.ThemeMode
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -215,7 +215,7 @@ private fun FrameRateOptionItem(
                 modifier = Modifier
                     .size(20.dp)
                     .clip(CircleShape)
-                    .background(PinkPrimary),
+                    .background(PurplePrimary),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
