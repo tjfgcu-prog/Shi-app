@@ -25,15 +25,15 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
 private val LightColorScheme = lightColorScheme(
-    primary = PinkPrimary,
-    onPrimary = Color(0xFF2D1F24),
-    primaryContainer = PinkPrimary.copy(alpha = 0.2f),
-    onPrimaryContainer = Color(0xFF2D1F24),
-    secondary = Color(0xFF9B6B7A),
+    primary = PurplePrimary,
+    onPrimary = WeChatLightTextPrimary,
+    primaryContainer = PurplePrimary.copy(alpha = 0.2f),
+    onPrimaryContainer = WeChatLightTextPrimary,
+    secondary = PurpleSecondary,
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFF9B6B7A).copy(alpha = 0.1f),
-    onSecondaryContainer = Color(0xFF9B6B7A),
-    tertiary = PinkDark,
+    secondaryContainer = PurpleSecondary.copy(alpha = 0.1f),
+    onSecondaryContainer = PurpleSecondary,
+    tertiary = PurpleDark,
     onTertiary = Color.White,
     background = WeChatLightBackground,
     onBackground = WeChatLightTextPrimary,
@@ -47,15 +47,15 @@ private val LightColorScheme = lightColorScheme(
 )
 
 private val DarkColorScheme = darkColorScheme(
-    primary = PinkPrimary,
-    onPrimary = Color(0xFF2D1F24),
-    primaryContainer = PinkPrimary.copy(alpha = 0.15f),
-    onPrimaryContainer = Color(0xFFF5E6EB),
-    secondary = PinkLight,
+    primary = PurplePrimary,
+    onPrimary = WeChatDarkBackground,
+    primaryContainer = PurplePrimary.copy(alpha = 0.15f),
+    onPrimaryContainer = WeChatDarkTextPrimary,
+    secondary = PurpleLight,
     onSecondary = Color(0xFF2D2C24),
-    secondaryContainer = PinkLight.copy(alpha = 0.1f),
-    onSecondaryContainer = PinkLight,
-    tertiary = PinkDark,
+    secondaryContainer = PurpleLight.copy(alpha = 0.1f),
+    onSecondaryContainer = PurpleLight,
+    tertiary = PurpleDark,
     onTertiary = Color.White,
     background = WeChatDarkBackground,
     onBackground = WeChatDarkTextPrimary,
@@ -109,7 +109,7 @@ fun LianYuTheme(
                 Color(0xFFFFFFFF).copy(alpha = 0.55f)
             }.toArgb()
 
-            // 状态栏使用不透明纯色，浅色主题用纯白避免显粉；深色主题用背景色保持一致。
+            // 状态栏使用不透明纯色，浅色主题用纯白；深色主题用背景色保持一致。
             window.statusBarColor = if (effectiveDarkTheme) {
                 colorScheme.background.toArgb()
             } else {
