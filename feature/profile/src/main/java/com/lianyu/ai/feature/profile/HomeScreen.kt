@@ -41,6 +41,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -79,8 +80,12 @@ fun HomeScreen(
     viewModel: HomeViewModel = viewModel(),
     groupViewModel: ChatGroupViewModel = viewModel()
 ) {
-    val chatList by viewModel.chatList.collectAsState(initial = emptyList())
-    val groups by groupViewModel.groups.collectAsState(initial = emptyList())
+    // null = 数据库还没读出来。不能用空列表当初始值，否则重新进入页面的瞬间会闪出"还没有聊天记录"。
+    val loadedChatList by viewModel.chatList.collectAsState(initial = null)
+    val loadedGroups by groupViewModel.groups.collectAsState(initial = null)
+    val isLoaded = loadedChatList != null && loadedGroups != null
+    val chatList = loadedChatList.orEmpty()
+    val groups = loadedGroups.orEmpty()
     var isVisible by remember { mutableStateOf(true) }
     var selectedTab by remember { mutableStateOf(HomeTab.ALL) }
     val adaptiveSizing = rememberAdaptiveSizing()
@@ -119,6 +124,7 @@ fun HomeScreen(
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = "${chatList.size} 个会话 · ${groups.size} 个群聊",
+                            modifier = Modifier.alpha(if (isLoaded) 1f else 0f),
                             fontSize = 12.sp,
                             color = colorScheme.onSurfaceVariant
                         )
@@ -178,7 +184,7 @@ fun HomeScreen(
                 HomeTab.GROUP -> emptyList()
             }
 
-            if (displayGroups.isEmpty() && displayChats.isEmpty()) {
+            if (isLoaded && displayGroups.isEmpty() && displayChats.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     EmptyHomeState()
                 }
