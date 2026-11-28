@@ -2,10 +2,13 @@ package com.lianyu.ai
 
 import android.app.Activity
 import androidx.activity.ComponentActivity
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -161,10 +164,17 @@ fun MainScreen(mainActivity: Activity) {
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
-            if (showBottomBar) {
+            // 跟随页面转场淡入淡出并收放高度，而不是点击瞬间一下子消失/出现
+            AnimatedVisibility(
+                visible = showBottomBar,
+                enter = fadeIn(tween(300, easing = FastOutSlowInEasing)) +
+                    expandVertically(tween(300, easing = FastOutSlowInEasing)),
+                exit = fadeOut(tween(300, easing = FastOutSlowInEasing)) +
+                    shrinkVertically(tween(300, easing = FastOutSlowInEasing))
+            ) {
                 FloatingGlassBottomNav(
-    items = bottomNavItems,
-    currentIndex = pagerState.currentPage,
+                    items = bottomNavItems,
+                    currentIndex = pagerState.currentPage,
                     onItemClick = { index ->
                         lastTabPage = index
                         coroutineScope.launch { pagerState.scrollToPage(index) }
@@ -179,21 +189,19 @@ fun MainScreen(mainActivity: Activity) {
             NavHost(
                 navController = navController,
                 startDestination = "home",
+                // 纯滑动、不淡入淡出：每个页面自带不透明背景，新页面整页盖住旧页面即可。
+                // 若再加淡入淡出，两个页面会同时半透明叠在一起（重影）。
                 enterTransition = {
-                    fadeIn(animationSpec = tween(300, easing = FastOutSlowInEasing)) +
-                        slideInHorizontally(animationSpec = tween(300, easing = FastOutSlowInEasing), initialOffsetX = { it / 4 })
+                    slideInHorizontally(animationSpec = tween(300, easing = FastOutSlowInEasing), initialOffsetX = { it })
                 },
                 exitTransition = {
-                    fadeOut(animationSpec = tween(300, easing = FastOutSlowInEasing)) +
-                        slideOutHorizontally(animationSpec = tween(300, easing = FastOutSlowInEasing), targetOffsetX = { -it / 6 })
+                    slideOutHorizontally(animationSpec = tween(300, easing = FastOutSlowInEasing), targetOffsetX = { -it / 4 })
                 },
                 popEnterTransition = {
-                    fadeIn(animationSpec = tween(300, easing = FastOutSlowInEasing)) +
-                        slideInHorizontally(animationSpec = tween(300, easing = FastOutSlowInEasing), initialOffsetX = { -it / 4 })
+                    slideInHorizontally(animationSpec = tween(300, easing = FastOutSlowInEasing), initialOffsetX = { -it / 4 })
                 },
                 popExitTransition = {
-                    fadeOut(animationSpec = tween(300, easing = FastOutSlowInEasing)) +
-                        slideOutHorizontally(animationSpec = tween(300, easing = FastOutSlowInEasing), targetOffsetX = { it / 4 })
+                    slideOutHorizontally(animationSpec = tween(300, easing = FastOutSlowInEasing), targetOffsetX = { it })
                 }
             ) {
                 // === 主页 Pager ===
