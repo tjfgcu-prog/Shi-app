@@ -56,7 +56,7 @@ import coil.request.ImageRequest
 import com.lianyu.ai.database.model.ChatGroup
 import com.lianyu.ai.database.model.ChatMessage
 import com.lianyu.ai.database.model.CompanionEntity
-import com.lianyu.ai.uicommon.theme.PinkPrimary
+import com.lianyu.ai.uicommon.theme.PurplePrimary
 import com.lianyu.ai.uicommon.theme.AdaptiveSizing
 import com.lianyu.ai.uicommon.theme.rememberAdaptiveSizing
 import com.lianyu.ai.database.viewmodel.ChatGroupViewModel
@@ -267,7 +267,7 @@ fun SectionTitle(
                 .width(3.dp)
                 .height(14.dp)
                 .clip(RoundedCornerShape(2.dp))
-                .background(PinkPrimary)
+                .background(PurplePrimary)
         )
         Spacer(modifier = Modifier.width(8.dp))
         Text(
@@ -315,7 +315,7 @@ fun HomeTabBar(
                     text = label,
                     fontSize = 14.sp,
                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                    color = if (selected) PinkPrimary else colorScheme.onSurfaceVariant
+                    color = if (selected) PurplePrimary else colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -363,8 +363,8 @@ fun GroupListItem(
                             .background(
                                 Brush.radialGradient(
                                     colors = listOf(
-                                        PinkPrimary.copy(alpha = 0.6f),
-                                        PinkPrimary.copy(alpha = 0.3f)
+                                        PurplePrimary.copy(alpha = 0.6f),
+                                        PurplePrimary.copy(alpha = 0.3f)
                                     )
                                 )
                             ),
@@ -478,7 +478,7 @@ fun ChatListItem(
                         modifier = Modifier
                             .size(10.dp)
                             .clip(CircleShape)
-                            .background(PinkPrimary)
+                            .background(PurplePrimary)
                     )
                 }
             }
